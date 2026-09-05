@@ -1,0 +1,11 @@
+﻿market,strategy,strategy_name,trades,win_rate,avg_return_pct
+KR,bb_lower,볼린저밴드 하단터치,2620,64.31,2.47
+KR,rsi_oversold,RSI 과매도,1329,66.82,3.22
+KR,golden_cross,골든크로스,2272,52.86,0.14
+KR,new_high_20,20일 신고가 돌파,4684,46.65,0.17
+KR,rising_bearish,상승음봉,13112,51.82,0.25
+US,bb_lower,볼린저밴드 하단터치,17015,57.17,0.76
+US,rsi_oversold,RSI 과매도,12982,58.47,0.89
+US,golden_cross,골든크로스,11541,55.58,0.09
+US,new_high_20,20일 신고가 돌파,28672,50.61,0.02
+US,rising_bearish,상승음봉,67782,54.96,0.1
