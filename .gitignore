@@ -7,9 +7,11 @@ logs/
 service_account.json
 notified_state.json
 pending_notifications.json
-last_scan_*.json
-latest_*.csv
 latest_*.csv.bak
+last_scan_doubleb.json
+latest_doubleb.csv
+# latest_recommendations.csv / last_scan_recommendations.json / recommendations_log.csv는
+# GitHub Actions가 실행마다 커밋해서 상태를 유지하는 파일이라 추적함(gitignore 대상 아님)
 backtest_*_trades_*.csv
 backtest_*summary*.csv
 backtest_doubleb_intraday_*.csv

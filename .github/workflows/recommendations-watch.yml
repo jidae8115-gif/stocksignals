@@ -1,0 +1,39 @@
+name: RecommendationsWatch
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  TZ: Asia/Seoul   # datetime.now() 기반 is_market_hours() 판정이 한국시간 기준이어야 함
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write service account key
+        run: echo '${{ secrets.SERVICE_ACCOUNT_JSON }}' > service_account.json
+
+      - name: Run watch_recommendations.py
+        run: python watch_recommendations.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "stocksignals-bot"
+          git config user.email "actions@github.com"
+          git add latest_recommendations.csv last_scan_recommendations.json 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "chore: update recommendations [skip ci]"
+          git push
