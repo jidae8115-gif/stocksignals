@@ -25,7 +25,7 @@ jobs:
         run: pip install -r requirements-cloud.txt
 
       - name: Write service account key
-        run: echo '${{ secrets.SERVICE_ACCOUNT_JSON }}' > service_account.json
+        run: echo '${{ secrets.SERVICE_ACCOUNT_JSON_B64 }}' | base64 -d > service_account.json
 
       - name: Run watch_recommendations.py
         run: python watch_recommendations.py

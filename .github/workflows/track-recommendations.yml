@@ -26,9 +26,9 @@ jobs:
 
       - name: Write service account key
         run: |
-          echo '${{ secrets.SERVICE_ACCOUNT_JSON }}' > service_account.json
+          echo '${{ secrets.SERVICE_ACCOUNT_JSON_B64 }}' | base64 -d > service_account.json
           echo "bytes written: $(wc -c < service_account.json)"
-          python -c "import json; json.load(open('service_account.json')); print('valid JSON, client_email =', json.load(open('service_account.json'))['client_email'])"
+          python -c "import json; d=json.load(open('service_account.json')); print('valid JSON, client_email =', d['client_email'])"
 
       - name: Run track_recommendations.py
         run: python track_recommendations.py
