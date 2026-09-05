@@ -25,7 +25,10 @@ jobs:
         run: pip install -r requirements-cloud.txt
 
       - name: Write service account key
-        run: echo '${{ secrets.SERVICE_ACCOUNT_JSON }}' > service_account.json
+        run: |
+          echo '${{ secrets.SERVICE_ACCOUNT_JSON }}' > service_account.json
+          echo "bytes written: $(wc -c < service_account.json)"
+          python -c "import json; json.load(open('service_account.json')); print('valid JSON, client_email =', json.load(open('service_account.json'))['client_email'])"
 
       - name: Run track_recommendations.py
         run: python track_recommendations.py
