@@ -1,11 +1,10 @@
+# GitHub Actions(Linux 러너)용 — win11toast는 Windows 전용이라 제외
 pandas>=2.0
 numpy>=1.24
-# FinanceDataReader는 PyPI에 정식 배포되지 않아(0.9.50 태그 자체가 없음) GitHub 소스로 설치해야 함
 git+https://github.com/FinanceData/FinanceDataReader.git
 requests>=2.31
 streamlit>=1.30
 openpyxl>=3.1
-win11toast>=0.32
 python-dateutil>=2.8
 google-api-python-client>=2.100
 google-auth>=2.23
