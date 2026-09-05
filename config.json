@@ -1,0 +1,47 @@
+{
+  "account": {
+    "balance_krw": 10000000,
+    "balance_usd": 10000
+  },
+  "risk": {
+    "risk_per_trade_pct": 2.0,
+    "max_position_pct": 20.0
+  },
+  "volume_filter": {
+    "min_ratio": 1.5,
+    "lookback": 20
+  },
+  "liquidity_filter": {
+    "kr_min_value_krw": 500000000,
+    "us_min_value_usd": 5000000
+  },
+  "backtest": {
+    "hold_days": 5,
+    "lookback_years": 3
+  },
+  "telegram": {
+    "bot_token": "",
+    "chat_id": "",
+    "quiet_hours": {
+      "start": "23:00",
+      "end": "06:00"
+    }
+  },
+  "market_hours": {
+    "kr": {
+      "start": "09:00",
+      "end": "15:30"
+    },
+    "us": {
+      "start": "22:00",
+      "end": "06:30"
+    }
+  },
+  "dashboard": {
+    "port": 8501
+  },
+  "google_drive": {
+    "folder_id": "1wvE9gMK5yphddO-sp4CJ4VnKlNVNhPbu",
+    "sheet_title": "StockSignals 추천종목 추적"
+  }
+}

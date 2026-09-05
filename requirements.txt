@@ -1,0 +1,11 @@
+pandas>=2.0
+numpy>=1.24
+FinanceDataReader>=0.9.50
+requests>=2.31
+streamlit>=1.30
+openpyxl>=3.1
+win11toast>=0.32
+python-dateutil>=2.8
+google-api-python-client>=2.100
+google-auth>=2.23
+yfinance>=0.2.40
