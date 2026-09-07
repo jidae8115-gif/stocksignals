@@ -55,7 +55,7 @@ def main():
     print(result_df.to_string(index=False))
     print("결론: 최고 수익률도 거의 0에 가까움 — 엣지 없음, 폐기.")
 
-    tag = datetime.now().strftime("%Y-%m-%d")
+    tag = c.now_kst().strftime("%Y-%m-%d")
     result_df.to_csv(os.path.join(c.BASE_DIR, f"daytrade_gap_{tag}.csv"), index=False, encoding="utf-8-sig")
 
 

@@ -34,7 +34,7 @@ def main():
     args = parser.parse_args()
 
     t0 = time.time()
-    print(f"=== scan_doubleb.py 실행 {datetime.now().isoformat()} ===")
+    print(f"=== scan_doubleb.py 실행 {c.now_kst().isoformat()} ===")
 
     kr_df = scan("KR")
     us_df = scan("US")
@@ -57,7 +57,7 @@ def main():
 
     with open(STATUS_PATH, "w", encoding="utf-8") as f:
         json.dump({
-            "last_run": datetime.now().isoformat(),
+            "last_run": c.now_kst().isoformat(),
             "kr_active": True, "us_active": True,
             "signal_count": len(all_df),
         }, f, ensure_ascii=False, indent=2)

@@ -45,7 +45,7 @@ def append_new_recommendations(log_df, latest_df):
             "backtest_win_rate": row.get("backtest_win_rate"), "backtest_avg_return": row.get("backtest_avg_return"),
             "status": "OPEN", "current_price": row["buy_price"], "current_return_pct": 0.0,
             "exit_date": None, "exit_price": None, "realized_return_pct": None,
-            "last_checked": datetime.now().isoformat(),
+            "last_checked": c.now_kst().isoformat(),
         })
 
     if new_rows:
@@ -87,7 +87,7 @@ def update_open_positions(log_df):
         last_close = float(df["Close"].iloc[-1])
         log_df.at[idx, "current_price"] = last_close
         log_df.at[idx, "current_return_pct"] = round((last_close - row["buy_price"]) / row["buy_price"] * 100, 2)
-        log_df.at[idx, "last_checked"] = datetime.now().isoformat()
+        log_df.at[idx, "last_checked"] = c.now_kst().isoformat()
 
         if status != "OPEN":
             log_df.at[idx, "status"] = status

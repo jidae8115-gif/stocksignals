@@ -29,7 +29,7 @@ def main():
     args = parser.parse_args()
 
     out_path = args.out or os.path.join(
-        c.BASE_DIR, f"stocksignals_export_{datetime.now().strftime('%Y-%m-%d_%H%M')}.xlsx"
+        c.BASE_DIR, f"stocksignals_export_{c.now_kst().strftime('%Y-%m-%d_%H%M')}.xlsx"
     )
 
     sheets_written = 0

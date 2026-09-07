@@ -53,7 +53,7 @@ def main():
     print("\n=== 더블비 백테스트 요약 (README §2 재현) ===")
     print(summary_df.to_string(index=False))
 
-    tag = datetime.now().strftime("%Y-%m-%d")
+    tag = c.now_kst().strftime("%Y-%m-%d")
     summary_df.to_csv(os.path.join(c.BASE_DIR, f"backtest_doubleb_summary_{tag}.csv"), index=False, encoding="utf-8-sig")
     if all_trades:
         pd.concat(all_trades, ignore_index=True).to_csv(

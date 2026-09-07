@@ -156,7 +156,7 @@ def main():
     else:
         print("오늘(최근 거래일) 5분봉 기준으로는 더블비 신호가 형성되지 않았습니다.")
 
-    tag = datetime.now().strftime("%Y-%m-%d_%H%M")
+    tag = c.now_kst().strftime("%Y-%m-%d_%H%M")
     out_path = f"backtest_doubleb_intraday_{tag}.csv"
     result.to_csv(out_path, index=False, encoding="utf-8-sig")
     print(f"\n저장: {out_path}")

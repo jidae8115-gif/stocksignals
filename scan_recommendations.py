@@ -31,7 +31,7 @@ def scan(market):
 def save_status(count, kr_active=True, us_active=True, error=None):
     with open(STATUS_PATH, "w", encoding="utf-8") as f:
         json.dump({
-            "last_run": datetime.now().isoformat(),
+            "last_run": c.now_kst().isoformat(),
             "kr_active": kr_active,
             "us_active": us_active,
             "signal_count": count,
@@ -44,7 +44,7 @@ def main():
     args = parser.parse_args()
 
     t0 = time.time()
-    print(f"=== scan_recommendations.py 실행 {datetime.now().isoformat()} ===")
+    print(f"=== scan_recommendations.py 실행 {c.now_kst().isoformat()} ===")
 
     kr_df = scan("KR")
     us_df = scan("US")

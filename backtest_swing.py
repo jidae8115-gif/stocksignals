@@ -47,7 +47,7 @@ def main():
     print(summary_df.to_string(index=False))
 
     out_dir = c.BASE_DIR
-    tag = datetime.now().strftime("%Y-%m-%d")
+    tag = c.now_kst().strftime("%Y-%m-%d")
     summary_df.to_csv(os.path.join(out_dir, f"backtest_swing_summary_{tag}.csv"), index=False, encoding="utf-8-sig")
     if all_trades:
         pd.concat(all_trades, ignore_index=True).to_csv(

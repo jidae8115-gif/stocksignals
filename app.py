@@ -62,7 +62,7 @@ with tab_reco:
         with open(status_path, "r", encoding="utf-8") as f:
             status = json.load(f)
         last_run = datetime.fromisoformat(status["last_run"])
-        age_min = (datetime.now() - last_run).total_seconds() / 60
+        age_min = (c.now_kst() - last_run).total_seconds() / 60
         col1, col2, col3 = st.columns(3)
         col1.metric("마지막 스캔", last_run.strftime("%H:%M:%S"), f"{age_min:.0f}분 전")
         col2.metric("한국장 활성", "예" if status.get("kr_active") else "아니오")
@@ -237,4 +237,4 @@ with tab_config:
                 json.dump(cfg, f, ensure_ascii=False, indent=2)
             st.success("저장되었습니다. (반영하려면 대시보드를 재시작하세요 — 모듈 캐시)")
 
-st.caption(f"마지막 새로고침: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.caption(f"마지막 새로고침: {c.now_kst().strftime('%Y-%m-%d %H:%M:%S')}")

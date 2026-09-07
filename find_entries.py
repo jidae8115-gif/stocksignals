@@ -29,7 +29,7 @@ def main():
     parser.add_argument("--backup", action="store_true", help="history/ 폴더에 날짜별 백업 저장")
     args = parser.parse_args()
 
-    print(f"=== find_entries.py 실행 {datetime.now().isoformat()} ===")
+    print(f"=== find_entries.py 실행 {c.now_kst().isoformat()} ===")
 
     kr_df = scan("KR")
     us_df = scan("US")
@@ -42,7 +42,7 @@ def main():
         print(all_df.to_string(index=False))
 
     if args.backup:
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = c.now_kst().strftime("%Y-%m-%d")
         out_path = os.path.join(c.BASE_DIR, "history", f"find_entries_{today}.csv")
         all_df.to_csv(out_path, index=False, encoding="utf-8-sig")
         print(f"백업 저장: {out_path}")

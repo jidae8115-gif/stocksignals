@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -37,6 +38,15 @@ def load_config():
 
 
 CONFIG = load_config()
+
+KST = ZoneInfo("Asia/Seoul")
+
+
+def now_kst():
+    """실행 서버 시간대와 무관하게 항상 한국시간(KST) 기준 naive datetime을 반환.
+    로컬 PC(이미 KST)·GitHub Actions(TZ=Asia/Seoul 지정)에서는 datetime.now()와 결과가 같지만,
+    Streamlit Cloud처럼 UTC로 도는 서버에서도 장시간 판정·타임스탬프가 항상 올바르게 나오게 함."""
+    return datetime.now(KST).replace(tzinfo=None)
 
 
 # ---------- 종목 유니버스 ----------
@@ -448,12 +458,12 @@ def _time_in_range(now_t, start_s, end_s):
 
 def is_market_hours(market):
     hours = CONFIG["market_hours"][market.lower()]
-    return _time_in_range(datetime.now().time(), hours["start"], hours["end"])
+    return _time_in_range(now_kst().time(), hours["start"], hours["end"])
 
 
 def in_quiet_hours():
     qh = CONFIG["telegram"]["quiet_hours"]
-    return _time_in_range(datetime.now().time(), qh["start"], qh["end"])
+    return _time_in_range(now_kst().time(), qh["start"], qh["end"])
 
 
 # ---------- 텔레그램 알림 ----------
@@ -463,7 +473,7 @@ def _queue_pending(message):
     if os.path.exists(PENDING_PATH):
         with open(PENDING_PATH, "r", encoding="utf-8") as f:
             pending = json.load(f)
-    pending.append({"message": message, "queued_at": datetime.now().isoformat()})
+    pending.append({"message": message, "queued_at": now_kst().isoformat()})
     with open(PENDING_PATH, "w", encoding="utf-8") as f:
         json.dump(pending, f, ensure_ascii=False, indent=2)
 
@@ -547,7 +557,7 @@ def notify_new_signals(df, state_key_cols=("date", "market", "code", "strategy")
         key = "|".join(str(row[c]) for c in state_key_cols)
         if key in state:
             continue
-        state[key] = datetime.now().isoformat()
+        state[key] = now_kst().isoformat()
         new_rows.append(row)
 
     if not new_rows:

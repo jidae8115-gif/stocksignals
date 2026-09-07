@@ -44,7 +44,7 @@ def main():
     print("\n=== 전체 유니버스 백테스트 요약 (README §3 재현) ===")
     print(summary_df.to_string(index=False))
 
-    tag = datetime.now().strftime("%Y-%m-%d")
+    tag = c.now_kst().strftime("%Y-%m-%d")
     summary_df.to_csv(os.path.join(c.BASE_DIR, f"backtest_full_universe_{tag}.csv"), index=False, encoding="utf-8-sig")
 
 

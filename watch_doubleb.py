@@ -16,7 +16,7 @@ STATUS_PATH = os.path.join(c.BASE_DIR, "last_scan_doubleb.json")
 
 def save_status(kr_active, us_active, count, error=None):
     status = {
-        "last_run": datetime.now().isoformat(),
+        "last_run": c.now_kst().isoformat(),
         "kr_active": kr_active,
         "us_active": us_active,
         "signal_count": count,
@@ -31,10 +31,10 @@ def main():
     us_active = c.is_market_hours("US")
 
     if not kr_active and not us_active:
-        print(f"{datetime.now().isoformat()} 장시간 아님 — 스킵")
+        print(f"{c.now_kst().isoformat()} 장시간 아님 — 스킵")
         return
 
-    print(f"=== watch_doubleb.py 실행 {datetime.now().isoformat()} (KR={kr_active} US={us_active}) ===")
+    print(f"=== watch_doubleb.py 실행 {c.now_kst().isoformat()} (KR={kr_active} US={us_active}) ===")
 
     try:
         frames = []

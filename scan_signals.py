@@ -53,7 +53,7 @@ def main():
         print()
         print(result.to_string(index=False))
 
-    out_path = os.path.join(c.BASE_DIR, "history", f"scan_signals_{datetime.now().strftime('%Y-%m-%d_%H%M')}.csv")
+    out_path = os.path.join(c.BASE_DIR, "history", f"scan_signals_{c.now_kst().strftime('%Y-%m-%d_%H%M')}.csv")
     result.to_csv(out_path, index=False, encoding="utf-8-sig")
     print(f"\n저장: {out_path}")
 

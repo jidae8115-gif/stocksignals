@@ -59,7 +59,7 @@ def main():
     print(result_df.to_string(index=False))
     print("결론: 승률은 높게 나와도 평균수익률은 0에 수렴(꼬리손실) — 엣지 없음, 폐기.")
 
-    tag = datetime.now().strftime("%Y-%m-%d")
+    tag = c.now_kst().strftime("%Y-%m-%d")
     result_df.to_csv(os.path.join(c.BASE_DIR, f"daytrade_vwap_{tag}.csv"), index=False, encoding="utf-8-sig")
 
 
