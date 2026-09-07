@@ -40,7 +40,7 @@ jobs:
         run: |
           git config user.name "stocksignals-bot"
           git config user.email "actions@github.com"
-          git pull --rebase
           git add latest_recommendations.csv last_scan_recommendations.json notified_state.json 2>/dev/null || true
           git diff --staged --quiet || git commit -m "chore: update recommendations [skip ci]"
+          git pull --rebase
           git push
