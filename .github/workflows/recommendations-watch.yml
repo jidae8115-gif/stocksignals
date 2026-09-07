@@ -8,8 +8,14 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: recommendations-watch
+  cancel-in-progress: false
+
 env:
   TZ: Asia/Seoul   # datetime.now() 기반 is_market_hours() 판정이 한국시간 기준이어야 함
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
 jobs:
   watch:
@@ -34,6 +40,7 @@ jobs:
         run: |
           git config user.name "stocksignals-bot"
           git config user.email "actions@github.com"
-          git add latest_recommendations.csv last_scan_recommendations.json 2>/dev/null || true
+          git pull --rebase
+          git add latest_recommendations.csv last_scan_recommendations.json notified_state.json 2>/dev/null || true
           git diff --staged --quiet || git commit -m "chore: update recommendations [skip ci]"
           git push

@@ -5,8 +5,8 @@ history/
 logs/
 *.log
 service_account.json
-notified_state.json
 pending_notifications.json
+# notified_state.json은 GitHub Actions가 실행마다 커밋해서 중복 텔레그램 알림을 막는 용도라 추적함
 latest_*.csv.bak
 last_scan_doubleb.json
 latest_doubleb.csv

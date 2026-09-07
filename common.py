@@ -468,11 +468,18 @@ def _queue_pending(message):
         json.dump(pending, f, ensure_ascii=False, indent=2)
 
 
+def get_telegram_credentials():
+    """환경변수(TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID, GitHub Secrets용)를 config.json보다 우선.
+    리포지토리가 공개될 수 있어 토큰을 config.json에 평문으로 커밋하지 않기 위함."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN") or CONFIG["telegram"].get("bot_token", "")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID") or CONFIG["telegram"].get("chat_id", "")
+    return token, chat_id
+
+
 def send_telegram(message, allow_queue=True):
     """텔레그램 전송. 토큰/챗ID 없으면 콘솔 출력으로 대체.
     조용한시간(quiet_hours)엔 큐잉만 하고 06:00 flush_pending()에서 일괄 발송."""
-    token = CONFIG["telegram"].get("bot_token", "")
-    chat_id = CONFIG["telegram"].get("chat_id", "")
+    token, chat_id = get_telegram_credentials()
 
     if not token or not chat_id:
         print(f"[TELEGRAM-STUB] {message}")
@@ -501,8 +508,7 @@ def flush_pending():
         os.remove(PENDING_PATH)
         return
 
-    token = CONFIG["telegram"].get("bot_token", "")
-    chat_id = CONFIG["telegram"].get("chat_id", "")
+    token, chat_id = get_telegram_credentials()
     combined = "\n---\n".join(p["message"] for p in pending)
     if token and chat_id:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -549,12 +555,17 @@ def notify_new_signals(df, state_key_cols=("date", "market", "code", "strategy")
 
     new_df = pd.DataFrame(new_rows)
     for _, row in new_df.iterrows():
-        msg = (
-            f"[{row['market']}] {row['strategy_name']} 신호\n"
-            f"{row['name']}({row['code']}) 종가 {row['close']}\n"
-            f"날짜: {row['date']}"
-        )
-        send_telegram(msg)
+        lines = [f"[{row['market']}] {row['strategy_name']} 신호", f"{row['name']}({row['code']})"]
+        if "buy_price" in row and pd.notna(row.get("buy_price")):
+            lines.append(f"매수가 {row['buy_price']} / 목표 {row.get('target')} / 손절 {row.get('stop_loss')}")
+            if pd.notna(row.get("risk_reward")):
+                lines.append(f"손익비 {row['risk_reward']}")
+            if pd.notna(row.get("backtest_win_rate")):
+                lines.append(f"백테스트승률 {row['backtest_win_rate']}%")
+        else:
+            lines.append(f"종가 {row['close']}")
+        lines.append(f"날짜: {row['date']}")
+        send_telegram("\n".join(lines))
 
     save_notified_state(state)
     _fire_toast(f"신규 신호 {len(new_df)}건 발생")
