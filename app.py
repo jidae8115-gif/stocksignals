@@ -8,11 +8,42 @@ import sys
 from datetime import datetime
 
 import pandas as pd
+import requests
 import streamlit as st
 
 import common as c
 
 st.set_page_config(page_title="StockSignals 대시보드", page_icon="📈", layout="wide")
+
+GITHUB_REPO = "jidae8115-gif/stocksignals"
+GITHUB_WORKFLOWS = {
+    "추천종목 스캔 (RecommendationsWatch)": "recommendations-watch.yml",
+    "성과추적 갱신 (TrackRecommendations)": "track-recommendations.yml",
+}
+
+
+def get_github_token():
+    try:
+        token = st.secrets.get("GITHUB_TOKEN", "")
+    except Exception:
+        token = ""
+    return token or os.environ.get("GITHUB_TOKEN", "")
+
+
+def trigger_github_workflow(workflow_file, ref="main"):
+    """GitHub Actions workflow_dispatch로 워크플로우를 강제 실행. 자동 스캔이 멈췄을 때 수동 복구용."""
+    token = get_github_token()
+    if not token:
+        return False, "GITHUB_TOKEN이 설정되어 있지 않습니다 (Streamlit Cloud → Settings → Secrets에 추가 필요)."
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{workflow_file}/dispatches"
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+    try:
+        resp = requests.post(url, headers=headers, json={"ref": ref}, timeout=10)
+        if resp.status_code == 204:
+            return True, "GitHub Actions 워크플로우 실행 요청을 보냈습니다. 1~2분 내 반영됩니다."
+        return False, f"실패 (HTTP {resp.status_code}): {resp.text[:200]}"
+    except Exception as e:
+        return False, f"요청 오류: {e}"
 
 st.markdown(
     """
@@ -91,12 +122,20 @@ with st.sidebar:
         badges += pill("🇺🇸 개장" if status.get("us_active") else "🇺🇸 마감", "green" if status.get("us_active") else "gray")
         st.markdown(badges, unsafe_allow_html=True)
 
+        stalled = bool(status.get("error")) or age_min > 45
         if status.get("error"):
             st.error(f"스캔 실패: {status['error']}")
         elif age_min > 45:
             st.warning("45분 이상 지났습니다 — 자동 스캔 확인 필요")
         else:
             st.success("정상 작동 중")
+
+        if stalled:
+            st.caption("자동 스캔이 멈춘 것 같으면 아래에서 GitHub Actions를 직접 재실행하세요.")
+            wf_label = st.selectbox("워크플로우 선택", options=list(GITHUB_WORKFLOWS.keys()), label_visibility="collapsed")
+            if st.button("⚠️ GitHub Actions 강제 재실행", width="stretch"):
+                ok, msg = trigger_github_workflow(GITHUB_WORKFLOWS[wf_label])
+                (st.success if ok else st.error)(msg)
     else:
         st.info("아직 스캔 기록이 없습니다.")
 
