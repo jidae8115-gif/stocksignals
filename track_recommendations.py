@@ -36,13 +36,21 @@ def append_new_recommendations(log_df, latest_df):
         return log_df
 
     existing_keys = set()
+    open_keys = set()
     if not log_df.empty:
         existing_keys = set(zip(log_df["date"], log_df["market"], log_df["code"], log_df["strategy"]))
+        open_df = log_df[log_df["status"] == "OPEN"]
+        open_keys = set(zip(open_df["market"], open_df["code"], open_df["strategy"]))
 
     new_rows = []
     for _, row in latest_df.iterrows():
         key = (row["date"], row["market"], row["code"], row["strategy"])
         if key in existing_keys:
+            continue
+        # 같은 종목+전략이 아직 청산 안 된(OPEN) 포지션으로 이미 추적 중이면 새 날짜로
+        # 또 로그를 만들지 않는다 — 안 그러면 같은 트레이드가 중복 포지션으로 잡히고,
+        # 그새 주가가 내려간 만큼 손절가도 매번 따라 낮아지는 문제가 생김.
+        if (row["market"], row["code"], row["strategy"]) in open_keys:
             continue
         new_rows.append({
             "date": row["date"], "market": row["market"], "code": row["code"], "name": row["name"],

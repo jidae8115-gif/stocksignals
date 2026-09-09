@@ -9,6 +9,7 @@ from datetime import datetime
 import pandas as pd
 
 import common as c
+import track_recommendations as tr
 from scan_recommendations import scan, save_status, STATUS_PATH  # noqa: F401 (STATUS_PATH re-export)
 
 
@@ -80,6 +81,16 @@ def main():
         save_status(len(all_df), kr_active=kr_active, us_active=us_active)
 
         new_df = c.notify_new_signals(all_df) if not all_df.empty else all_df
+
+        # 텔레그램 발송과 같은 시점에 성과추적 로그에도 즉시 기록한다 — 예전엔 로그 기록을
+        # TrackRecommendations(15분 주기)의 다음 실행이 latest_recommendations.csv를 다시 읽을
+        # 때까지 미뤘는데, 그 사이에 신호가 뜨고 사라지면(예: 골든크로스가 한 스캔만 유지) 텔레그램은
+        # 갔지만 로그엔 영영 안 남는 문제가 있었다.
+        if not all_df.empty:
+            log_df = tr.load_log()
+            log_df = tr.append_new_recommendations(log_df, all_df)
+            log_df.to_csv(tr.LOG_PATH, index=False, encoding="utf-8-sig")
+
         print(f"신호 {len(all_df)}건(신규 {len(new_df)}건 텔레그램 발송) — latest_recommendations.csv 갱신")
     except Exception as e:
         err_msg = f"{type(e).__name__}: {e}"
