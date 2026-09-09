@@ -179,6 +179,33 @@ def get_realtime_price(code, market):
     return None
 
 
+def get_recent_news(code, market, limit=3):
+    """야후 파이낸스에서 종목 관련 최근 뉴스 헤드라인을 가져온다(무료 소스라 커버리지가
+    제한적이고, 특히 코스닥 소형주는 종목 전용 뉴스가 거의 없을 수 있음 — 그런 경우와
+    조회 실패 모두 조용히 빈 리스트를 반환하며, 호출부는 이를 '뉴스 없음'으로 처리한다."""
+    if yf is None:
+        return []
+    candidates = [code] if market == "US" else [f"{code}.KS", f"{code}.KQ"]
+    for ticker in candidates:
+        try:
+            items = yf.Ticker(ticker).news
+            if not items:
+                continue
+            out = []
+            for item in items[:limit]:
+                content = item.get("content", item)
+                title = content.get("title")
+                url = (content.get("canonicalUrl") or {}).get("url") or (content.get("clickThroughUrl") or {}).get("url")
+                provider = (content.get("provider") or {}).get("displayName", "")
+                if title:
+                    out.append({"title": title, "url": url, "provider": provider})
+            if out:
+                return out
+        except Exception:
+            continue
+    return []
+
+
 # ---------- 지표 계산 ----------
 
 def add_indicators(df):
@@ -447,22 +474,27 @@ BUY_WINDOW = {
 
 def load_backtest_stats():
     """최신 backtest_swing_summary_*.csv(5개 전략) + backtest_doubleb_summary_*.csv(더블비)에서
-    (market, strategy) -> (win_rate, avg_return_pct) 조회 테이블을 만든다.
-    더블비는 실전 스캔이 거래량 필터를 적용한 상태로 도니 그 조건과 일치하는 행을 사용."""
+    (market, strategy) -> (win_rate, avg_return_pct, avg_holding_days) 조회 테이블을 만든다.
+    더블비는 실전 스캔이 거래량 필터를 적용한 상태로 도니 그 조건과 일치하는 행을 사용.
+    avg_holding_days는 백테스트 거래 내역의 실제 관측된 (청산일-진입일) 평균(달력일 기준)."""
     stats = {}
 
     swing_files = sorted(glob.glob(os.path.join(BASE_DIR, "backtest_swing_summary_*.csv")))
     if swing_files:
         df = pd.read_csv(swing_files[-1])
         for _, row in df.iterrows():
-            stats[(row["market"], row["strategy"])] = (row["win_rate"], row["avg_return_pct"])
+            stats[(row["market"], row["strategy"])] = (
+                row["win_rate"], row["avg_return_pct"], row.get("holding_days"),
+            )
 
     db_files = sorted(glob.glob(os.path.join(BASE_DIR, "backtest_doubleb_summary_*.csv")))
     if db_files:
         df = pd.read_csv(db_files[-1])
         df = df[df["volume_filter"] == "적용"]
         for _, row in df.iterrows():
-            stats[(row["market"], "doubleb")] = (row["win_rate"], row["avg_return_pct"])
+            stats[(row["market"], "doubleb")] = (
+                row["win_rate"], row["avg_return_pct"], row.get("holding_days"),
+            )
 
     return stats
 
@@ -554,7 +586,8 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
                     atr14 = None if pd.isna(last["ATR14"]) else float(last["ATR14"])
                     stop_loss, target, risk_reward = compute_trade_levels(close, sma20, atr14)
                     buy_price_min, buy_price_max = compute_entry_range(close)
-                    bt_win_rate, bt_avg_return = backtest_stats.get((market, key), (None, None))
+                    bt_win_rate, bt_avg_return, bt_holding_days = backtest_stats.get((market, key), (None, None, None))
+                    news = get_recent_news(code, market, limit=1)
                     results.append({
                         "date": df.index[-1].strftime("%Y-%m-%d"),
                         "market": market,
@@ -571,17 +604,21 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
                         "risk_reward": risk_reward,
                         "backtest_win_rate": bt_win_rate,
                         "backtest_avg_return": bt_avg_return,
+                        "avg_holding_days": bt_holding_days,
                         "buy_window": buy_window,
                         "vol_ratio": None if pd.isna(last["VOL_RATIO"]) else float(last["VOL_RATIO"]),
                         "rsi14": None if pd.isna(last["RSI14"]) else float(last["RSI14"]),
                         "sma20": sma20,
+                        "news_headline": news[0]["title"] if news else None,
+                        "news_url": news[0]["url"] if news else None,
                     })
             except Exception:
                 continue
     cols = ["date", "market", "code", "name", "strategy", "strategy_name", "buy_price",
             "buy_price_min", "buy_price_max", "close",
             "stop_loss", "target", "risk_reward", "backtest_win_rate", "backtest_avg_return",
-            "buy_window", "vol_ratio", "rsi14", "sma20"]
+            "avg_holding_days", "buy_window", "vol_ratio", "rsi14", "sma20",
+            "news_headline", "news_url"]
     return pd.DataFrame(results, columns=cols)
 
 
@@ -725,8 +762,12 @@ def notify_new_signals(df, state_key_cols=("date", "market", "code", "strategy")
                 lines.append(f"손익비 {row['risk_reward']}")
             if pd.notna(row.get("backtest_win_rate")):
                 lines.append(f"백테스트승률 {row['backtest_win_rate']}%")
+            if pd.notna(row.get("avg_holding_days")):
+                lines.append(f"평균 보유기간 {row['avg_holding_days']}일 (백테스트 실측)")
         else:
             lines.append(f"종가 {row['close']}")
+        if pd.notna(row.get("news_headline")):
+            lines.append(f"📰 {row['news_headline']}")
         lines.append(f"날짜: {row['date']}")
         send_telegram("\n".join(lines))
 

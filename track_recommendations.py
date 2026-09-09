@@ -80,7 +80,7 @@ def update_open_positions(log_df):
         # 처음 기록될 당시 백테스트 요약 파일이 아직 없어 NaN으로 남은 승률/평균수익률을
         # 매 실행마다 재조회해서 채워넣는다(전략+시장 조합이 이후에 백테스트됐을 수 있으므로).
         if pd.isna(row.get("backtest_win_rate")):
-            wr, avg_ret = c.load_backtest_stats().get((row["market"], row["strategy"]), (None, None))
+            wr, avg_ret, _ = c.load_backtest_stats().get((row["market"], row["strategy"]), (None, None, None))
             if wr is not None:
                 log_df.at[idx, "backtest_win_rate"] = wr
                 log_df.at[idx, "backtest_avg_return"] = avg_ret

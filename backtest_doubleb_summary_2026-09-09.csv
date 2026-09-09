@@ -1,0 +1,5 @@
+﻿market,universe,volume_filter,trades,win_rate,avg_return_pct,holding_days
+KR,KOSPI100,미적용,53,77.36,3.78,7.8
+KR,KOSPI100,적용,37,75.68,3.61,7.8
+US,S&P500+나스닥,미적용,2404,51.25,1.02,7.0
+US,S&P500+나스닥,적용,796,49.37,-0.49,7.0

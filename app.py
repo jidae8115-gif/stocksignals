@@ -149,11 +149,12 @@ tab_reco, tab_track, tab_signals, tab_backtest, tab_config = st.tabs(
 with tab_reco:
     with st.expander("ℹ️ 전략 설명 및 계산 기준"):
         st.caption(
-            "KOSPI100+S&P500 매 5분 자동 스캔(RecommendationsWatch, 장시간 아니면 스킵) — "
-            "볼린저밴드 하단터치/RSI과매도/골든크로스/20일신고가돌파/상승음봉(실전 5개) + 더블비(표본부족으로 미편입, 참고용). "
+            "KOSPI100+KOSDAQ150+S&P500 매 5분 자동 스캔(RecommendationsWatch, 장시간 아니면 스킵) — "
+            "볼린저밴드 하단터치/RSI과매도/골든크로스/20일신고가돌파/상승음봉(실전 5개) + 더블비(표본부족으로 미편입, 참고용) "
+            "+ 종가베팅-모멘텀연속(코스닥 전용, 코스피에선 검증 안 됨). "
             "매수가는 신호일 종가, 손절가는 진입가-1.5×ATR(14), 목표가는 20일선(위에 있을 때) 또는 손익비 2:1 기준. "
-            "백테스트승률/평균수익률은 최근 backtest_swing.py·backtest_doubleb.py 실행 결과(같은 시장·전략)에서 가져옴 — "
-            "backtest_*.py를 다시 돌리면 최신 수치로 갱신됨."
+            "백테스트승률/평균수익률/평균보유기간은 최근 backtest_swing.py·backtest_doubleb.py 실행 결과(같은 시장·전략)에서 가져옴 — "
+            "backtest_*.py를 다시 돌리면 최신 수치로 갱신됨. 관련뉴스는 야후 파이낸스 무료 뉴스라 소형주는 안 뜰 수 있음(참고용)."
         )
         st.caption(f"🇰🇷 한국 매수 시간대: {c.BUY_WINDOW['KR']}  ·  🇺🇸 미국 매수 시간대: {c.BUY_WINDOW['US']}")
 
@@ -186,7 +187,8 @@ with tab_reco:
 
         table_cols = ["date", "market", "code", "name", "strategy_name",
                       "buy_price", "매수허용범위", "target", "stop_loss", "risk_reward",
-                      "backtest_win_rate", "backtest_avg_return", "buy_window"]
+                      "backtest_win_rate", "backtest_avg_return", "avg_holding_days", "buy_window",
+                      "news_headline", "news_url"]
         table_cols = [col for col in table_cols if col in shown.columns]
 
         st.dataframe(
@@ -196,7 +198,8 @@ with tab_reco:
                 "strategy_name": "전략", "buy_price": "매수가", "target": "목표가",
                 "stop_loss": "손절가", "risk_reward": "손익비",
                 "backtest_win_rate": "백테스트승률", "backtest_avg_return": "평균수익률",
-                "buy_window": "매수 시간대",
+                "avg_holding_days": "평균 보유기간", "buy_window": "매수 시간대",
+                "news_headline": "관련뉴스", "news_url": "기사",
             }),
             width="stretch",
             hide_index=True,
@@ -207,6 +210,8 @@ with tab_reco:
                 "손익비": st.column_config.NumberColumn(format="%.2f"),
                 "백테스트승률": st.column_config.ProgressColumn(format="%.1f%%", min_value=0, max_value=100),
                 "평균수익률": st.column_config.NumberColumn(format="%.2f%%"),
+                "평균 보유기간": st.column_config.NumberColumn(format="%.1f일"),
+                "기사": st.column_config.LinkColumn(display_text="🔗 기사"),
             },
         )
         st.caption(f"매수허용범위 = 신호가 대비 ±{c.CONFIG.get('risk', {}).get('entry_tolerance_pct', 0.5)}% — 딱 그 가격이 아니어도 이 범위 안이면 매수 유효.")
