@@ -186,10 +186,18 @@ with tab_reco:
             shown = shown[shown["market"] == market_choice]
         shown = shown.sort_values("backtest_win_rate", ascending=False, na_position="last")
 
+        shown = shown.assign(
+            매수허용범위=shown["buy_price_min"].map(lambda v: f"{v:g}") + " ~ "
+            + shown["buy_price_max"].map(lambda v: f"{v:g}")
+        ) if {"buy_price_min", "buy_price_max"}.issubset(shown.columns) else shown
+
+        table_cols = ["date", "market", "code", "name", "strategy_name",
+                      "buy_price", "매수허용범위", "target", "stop_loss", "risk_reward",
+                      "backtest_win_rate", "backtest_avg_return", "buy_window"]
+        table_cols = [col for col in table_cols if col in shown.columns]
+
         st.dataframe(
-            shown[["date", "market", "code", "name", "strategy_name",
-                   "buy_price", "target", "stop_loss", "risk_reward",
-                   "backtest_win_rate", "backtest_avg_return", "buy_window"]]
+            shown[table_cols]
             .rename(columns={
                 "date": "날짜", "market": "시장", "code": "코드", "name": "종목명",
                 "strategy_name": "전략", "buy_price": "매수가", "target": "목표가",
@@ -208,6 +216,7 @@ with tab_reco:
                 "평균수익률": st.column_config.NumberColumn(format="%.2f%%"),
             },
         )
+        st.caption(f"매수허용범위 = 신호가 대비 ±{c.CONFIG.get('risk', {}).get('entry_tolerance_pct', 0.5)}% — 딱 그 가격이 아니어도 이 범위 안이면 매수 유효.")
 
 # ---------- 성과추적 ----------
 with tab_track:
@@ -348,6 +357,10 @@ with tab_config:
             with st.container(border=True):
                 st.markdown("**⚖️ 리스크 · 필터**")
                 max_position_pct = st.number_input("최대 포지션 비율(%)", value=cfg["risk"]["max_position_pct"])
+                entry_tolerance_pct = st.number_input(
+                    "매수 허용범위(±%)", value=cfg["risk"].get("entry_tolerance_pct", 0.5), step=0.1,
+                    help="신호가 그대로 체결되기 어려우니 이 비율만큼 위아래로 허용범위를 표시합니다.",
+                )
                 vol_min_ratio = st.number_input("거래량 배수 필터", value=cfg["volume_filter"]["min_ratio"])
                 kr_min_value = st.number_input("한국 최소 거래대금(원)", value=cfg["liquidity_filter"]["kr_min_value_krw"], step=100000000)
                 us_min_value = st.number_input("미국 최소 거래대금($)", value=cfg["liquidity_filter"]["us_min_value_usd"], step=1000000)
@@ -366,6 +379,7 @@ with tab_config:
             cfg["account"]["balance_krw"] = balance_krw
             cfg["account"]["balance_usd"] = balance_usd
             cfg["risk"]["max_position_pct"] = max_position_pct
+            cfg["risk"]["entry_tolerance_pct"] = entry_tolerance_pct
             cfg["volume_filter"]["min_ratio"] = vol_min_ratio
             cfg["liquidity_filter"]["kr_min_value_krw"] = kr_min_value
             cfg["liquidity_filter"]["us_min_value_usd"] = us_min_value

@@ -366,6 +366,15 @@ def compute_trade_levels(close, sma20, atr14):
     return round(stop, 2), round(target, 2), rr
 
 
+def compute_entry_range(buy_price):
+    """신호 발생 시점 종가(buy_price) 그대로 체결되기는 어려우므로, 실제 매수 시 허용 가능한
+    가격대(허용범위)를 함께 제시. 폭은 config.json의 risk.entry_tolerance_pct(기본 0.5%)."""
+    tol_pct = CONFIG.get("risk", {}).get("entry_tolerance_pct", 0.5)
+    low = round(buy_price * (1 - tol_pct / 100), 2)
+    high = round(buy_price * (1 + tol_pct / 100), 2)
+    return low, high
+
+
 def build_signals(tickers, market, strategy_keys=None, require_volume=True, require_liquidity=True, progress_cb=None):
     """종목 리스트를 스캔해서 신호 발생 종목을 DataFrame으로 반환.
 
@@ -406,6 +415,7 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
                     sma20 = None if pd.isna(last["SMA20"]) else float(last["SMA20"])
                     atr14 = None if pd.isna(last["ATR14"]) else float(last["ATR14"])
                     stop_loss, target, risk_reward = compute_trade_levels(close, sma20, atr14)
+                    buy_price_min, buy_price_max = compute_entry_range(close)
                     bt_win_rate, bt_avg_return = backtest_stats.get((market, key), (None, None))
                     results.append({
                         "date": df.index[-1].strftime("%Y-%m-%d"),
@@ -415,6 +425,8 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
                         "strategy": key,
                         "strategy_name": spec["name"],
                         "buy_price": close,
+                        "buy_price_min": buy_price_min,
+                        "buy_price_max": buy_price_max,
                         "close": close,
                         "stop_loss": stop_loss,
                         "target": target,
@@ -428,7 +440,8 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
                     })
             except Exception:
                 continue
-    cols = ["date", "market", "code", "name", "strategy", "strategy_name", "buy_price", "close",
+    cols = ["date", "market", "code", "name", "strategy", "strategy_name", "buy_price",
+            "buy_price_min", "buy_price_max", "close",
             "stop_loss", "target", "risk_reward", "backtest_win_rate", "backtest_avg_return",
             "buy_window", "vol_ratio", "rsi14", "sma20"]
     return pd.DataFrame(results, columns=cols)
@@ -568,6 +581,8 @@ def notify_new_signals(df, state_key_cols=("date", "market", "code", "strategy")
         lines = [f"[{row['market']}] {row['strategy_name']} 신호", f"{row['name']}({row['code']})"]
         if "buy_price" in row and pd.notna(row.get("buy_price")):
             lines.append(f"매수가 {row['buy_price']} / 목표 {row.get('target')} / 손절 {row.get('stop_loss')}")
+            if pd.notna(row.get("buy_price_min")) and pd.notna(row.get("buy_price_max")):
+                lines.append(f"매수 허용범위 {row['buy_price_min']} ~ {row['buy_price_max']}")
             if pd.notna(row.get("risk_reward")):
                 lines.append(f"손익비 {row['risk_reward']}")
             if pd.notna(row.get("backtest_win_rate")):
