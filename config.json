@@ -6,7 +6,8 @@
   "risk": {
     "risk_per_trade_pct": 2.0,
     "max_position_pct": 20.0,
-    "entry_tolerance_pct": 0.5
+    "entry_tolerance_pct": 0.5,
+    "slippage_pct": 0.1
   },
   "volume_filter": {
     "min_ratio": 1.5,

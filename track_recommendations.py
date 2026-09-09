@@ -68,6 +68,15 @@ def update_open_positions(log_df):
     open_idx = log_df.index[log_df["status"] == "OPEN"]
     for idx in open_idx:
         row = log_df.loc[idx]
+
+        # 처음 기록될 당시 백테스트 요약 파일이 아직 없어 NaN으로 남은 승률/평균수익률을
+        # 매 실행마다 재조회해서 채워넣는다(전략+시장 조합이 이후에 백테스트됐을 수 있으므로).
+        if pd.isna(row.get("backtest_win_rate")):
+            wr, avg_ret = c.load_backtest_stats().get((row["market"], row["strategy"]), (None, None))
+            if wr is not None:
+                log_df.at[idx, "backtest_win_rate"] = wr
+                log_df.at[idx, "backtest_avg_return"] = avg_ret
+
         # days=30은 fetch_ohlcv 내부의 "60행 미만이면 무효" 기준에 걸려 매번 None이 나오던 버그였음 —
         # 기본값(약 500일치)을 써서 항상 충분한 데이터를 받도록 수정.
         df = c.fetch_ohlcv(row["code"])
@@ -84,13 +93,15 @@ def update_open_positions(log_df):
 
         for h, (dt, r) in enumerate(forward.iterrows(), start=1):
             if r["Low"] <= stop:
-                status, exit_date, exit_price = "STOP_HIT", dt, stop
+                # 갭하락으로 시가가 이미 손절가 아래면 시가에 체결(손절가보다 더 나쁠 수 있음).
+                raw_exit = min(stop, float(r["Open"]))
+                status, exit_date, exit_price = "STOP_HIT", dt, c.apply_slippage(raw_exit)
                 break
             if r["Close"] >= target:
-                status, exit_date, exit_price = "TARGET_HIT", dt, target
+                status, exit_date, exit_price = "TARGET_HIT", dt, c.apply_slippage(target)
                 break
             if h >= 5:
-                status, exit_date, exit_price = "FORCE_CLOSED", dt, float(r["Close"])
+                status, exit_date, exit_price = "FORCE_CLOSED", dt, c.apply_slippage(float(r["Close"]))
                 break
 
         last_close = float(df["Close"].iloc[-1])
@@ -98,11 +109,13 @@ def update_open_positions(log_df):
         current_price = realtime_price if realtime_price is not None else last_close
 
         # 일봉엔 아직 당일 값이 안 반영됐을 수 있으므로, 그때까지 OPEN이면 실시간가로 즉시 판정.
+        # 이미 실제 관측된 가격(realtime_price)이 있으니 이상적인 stop/target이 아니라
+        # 그 실제 가격을 체결가로 쓴다(갭/슬리피지가 이미 반영된 값).
         if status == "OPEN" and realtime_price is not None:
             if realtime_price <= stop:
-                status, exit_date, exit_price = "STOP_HIT", c.now_kst(), stop
+                status, exit_date, exit_price = "STOP_HIT", c.now_kst(), c.apply_slippage(realtime_price)
             elif realtime_price >= target:
-                status, exit_date, exit_price = "TARGET_HIT", c.now_kst(), target
+                status, exit_date, exit_price = "TARGET_HIT", c.now_kst(), c.apply_slippage(realtime_price)
 
         log_df.at[idx, "current_price"] = current_price
         log_df.at[idx, "current_return_pct"] = round((current_price - row["buy_price"]) / row["buy_price"] * 100, 2)

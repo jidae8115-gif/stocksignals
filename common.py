@@ -397,6 +397,13 @@ def compute_entry_range(buy_price):
     return low, high
 
 
+def apply_slippage(price):
+    """목표가/손절가 청산은 이상적인 가격 그대로 체결되지 않으므로(스프레드·갭·체결지연),
+    config.json의 risk.slippage_pct(기본 0.1%)만큼 매도자에게 불리한 방향으로 가격을 보정."""
+    pct = CONFIG.get("risk", {}).get("slippage_pct", 0.1)
+    return round(price * (1 - pct / 100), 2)
+
+
 def build_signals(tickers, market, strategy_keys=None, require_volume=True, require_liquidity=True, progress_cb=None):
     """종목 리스트를 스캔해서 신호 발생 종목을 DataFrame으로 반환.
 

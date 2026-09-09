@@ -361,6 +361,10 @@ with tab_config:
                     "매수 허용범위(±%)", value=cfg["risk"].get("entry_tolerance_pct", 0.5), step=0.1,
                     help="신호가 그대로 체결되기 어려우니 이 비율만큼 위아래로 허용범위를 표시합니다.",
                 )
+                slippage_pct = st.number_input(
+                    "청산 슬리피지(%)", value=cfg["risk"].get("slippage_pct", 0.1), step=0.05,
+                    help="목표가/손절가 청산 시 실제 체결가가 불리하게 밀리는 정도를 성과추적에 반영합니다.",
+                )
                 vol_min_ratio = st.number_input("거래량 배수 필터", value=cfg["volume_filter"]["min_ratio"])
                 kr_min_value = st.number_input("한국 최소 거래대금(원)", value=cfg["liquidity_filter"]["kr_min_value_krw"], step=100000000)
                 us_min_value = st.number_input("미국 최소 거래대금($)", value=cfg["liquidity_filter"]["us_min_value_usd"], step=1000000)
@@ -380,6 +384,7 @@ with tab_config:
             cfg["account"]["balance_usd"] = balance_usd
             cfg["risk"]["max_position_pct"] = max_position_pct
             cfg["risk"]["entry_tolerance_pct"] = entry_tolerance_pct
+            cfg["risk"]["slippage_pct"] = slippage_pct
             cfg["volume_filter"]["min_ratio"] = vol_min_ratio
             cfg["liquidity_filter"]["kr_min_value_krw"] = kr_min_value
             cfg["liquidity_filter"]["us_min_value_usd"] = us_min_value
