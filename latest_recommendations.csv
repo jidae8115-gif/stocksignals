@@ -1,1 +1,1 @@
-﻿date,market,code,name,strategy,strategy_name,buy_price,close,stop_loss,target,risk_reward,backtest_win_rate,backtest_avg_return,buy_window,vol_ratio,rsi14,sma20
+﻿date,market,code,name,strategy,strategy_name,buy_price,buy_price_min,buy_price_max,close,stop_loss,target,risk_reward,backtest_win_rate,backtest_avg_return,buy_window,vol_ratio,rsi14,sma20
