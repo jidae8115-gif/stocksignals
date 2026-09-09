@@ -12,20 +12,32 @@ import pandas as pd
 import common as c
 
 STATUS_PATH = os.path.join(c.BASE_DIR, "last_scan_recommendations.json")
-ALL_STRATEGIES = list(c.STRATEGIES.keys())
+
+# 종가베팅-모멘텀연속(코스닥)은 코스닥에서만 검증된 전략이라 코스피/미국 스캔에서는 제외하고
+# 코스닥 전용 스캔에서만 적용한다.
+_KOSDAQ_ONLY = "momentum_continuation_v2"
+KOSPI_STRATEGIES = [k for k in c.STRATEGIES.keys() if k != _KOSDAQ_ONLY]
+US_STRATEGIES = KOSPI_STRATEGIES
+KOSDAQ_STRATEGIES = [_KOSDAQ_ONLY]
+ALL_STRATEGIES = list(c.STRATEGIES.keys())  # scan_signals.py 등 기존 참조 호환용
 
 
 def scan(market):
+    def make_progress(label):
+        def progress(idx, total, code, name):
+            if idx % 50 == 0:
+                print(f"  [{label}] {idx}/{total} {code} {name}", file=sys.stderr)
+        return progress
+
     if market == "KR":
-        tickers = c.get_kr_universe(top_n=100, market="KOSPI")
-    else:
-        tickers = c.get_us_universe(top_n=500, index="S&P500")
+        kospi_tickers = c.get_kr_universe(top_n=100, market="KOSPI")
+        kosdaq_tickers = c.get_kr_universe(top_n=150, market="KOSDAQ")
+        kospi_df = c.build_signals(kospi_tickers, "KR", strategy_keys=KOSPI_STRATEGIES, progress_cb=make_progress("KR-KOSPI"))
+        kosdaq_df = c.build_signals(kosdaq_tickers, "KR", strategy_keys=KOSDAQ_STRATEGIES, progress_cb=make_progress("KR-KOSDAQ"))
+        return pd.concat([kospi_df, kosdaq_df], ignore_index=True)
 
-    def progress(idx, total, code, name):
-        if idx % 50 == 0:
-            print(f"  [{market}] {idx}/{total} {code} {name}", file=sys.stderr)
-
-    return c.build_signals(tickers, market, strategy_keys=ALL_STRATEGIES, progress_cb=progress)
+    tickers = c.get_us_universe(top_n=500, index="S&P500")
+    return c.build_signals(tickers, market, strategy_keys=US_STRATEGIES, progress_cb=make_progress("US"))
 
 
 def save_status(count, kr_active=True, us_active=True, error=None):

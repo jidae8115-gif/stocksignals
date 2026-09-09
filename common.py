@@ -316,6 +316,111 @@ def signal_rising_bearish(df, i=-1):
     return bool(uptrend and bearish_candle and above_sma20)
 
 
+def signal_momentum_continuation(df, i=-1):
+    """종가베팅 유형1(모멘텀 연속성): 뚜렷한 재료로 당일 급등(전일比 5%+) + 거래량 급증(2배+) +
+    종가가 당일 고가 근처(윗꼬리 짧은 강한 양봉) — 이 상승이 다음날까지 이어질 걸 기대하고 종가 매수."""
+    idx = i if i >= 0 else len(df) + i
+    if idx < 20:
+        return False
+    row = df.iloc[idx]
+    prev = df.iloc[idx - 1]
+    if pd.isna(row.get("VOL_RATIO")) or pd.isna(prev["Close"]) or row["High"] == row["Low"]:
+        return False
+    pct_gain = (row["Close"] - prev["Close"]) / prev["Close"]
+    strong_gain = pct_gain >= 0.05
+    vol_surge = row["VOL_RATIO"] >= 2.0
+    closes_near_high = (row["Close"] - row["Low"]) / (row["High"] - row["Low"]) >= 0.7
+    return bool(strong_gain and vol_surge and closes_near_high)
+
+
+def signal_pullback_rebound(df, i=-1):
+    """종가베팅 유형2(조정 후 반등): 최근 20일 내 15%+ 급등으로 전고점을 만든 뒤 5~25% 눌림 조정,
+    오늘은 거래량이 줄면서 양봉으로 반등 시작 — 눌림목 지지 확인 후 종가 매수."""
+    idx = i if i >= 0 else len(df) + i
+    if idx < 25:
+        return False
+    row = df.iloc[idx]
+    window_close = df["Close"].iloc[idx - 20:idx]
+    if window_close.empty:
+        return False
+    recent_high = window_close.max()
+    recent_low = window_close.min()
+    if pd.isna(recent_high) or pd.isna(recent_low) or recent_low <= 0:
+        return False
+    had_strong_rally = (recent_high / recent_low) >= 1.15
+    off_high = row["Close"] / recent_high
+    pulled_back = 0.75 <= off_high <= 0.95
+    bullish_candle = row["Close"] > row["Open"]
+    vol5 = df["Volume"].iloc[idx - 5:idx].mean()
+    vol_declining = pd.notna(vol5) and vol5 > 0 and row["Volume"] < vol5
+    return bool(had_strong_rally and pulled_back and bullish_candle and vol_declining)
+
+
+def signal_momentum_continuation_v2(df, i=-1):
+    """유형1 개선판 — v1은 승률<50%였지만 승/패 비대칭(승 +5.94% vs 패 -2.79%)이 좋아서 승률만
+    올리면 되는 케이스였음. 조건 추가: (a) 20일 신고가 갱신(레인지 안 등락이 아닌 진짜 돌파),
+    (b) 20일선 자체도 상승 추세(순풍 속 상승)."""
+    idx = i if i >= 0 else len(df) + i
+    if idx < 20:
+        return False
+    row = df.iloc[idx]
+    prev = df.iloc[idx - 1]
+    if pd.isna(row.get("VOL_RATIO")) or pd.isna(prev["Close"]) or row["High"] == row["Low"]:
+        return False
+    if pd.isna(row.get("SMA20")) or pd.isna(df["SMA20"].iloc[idx - 5]):
+        return False
+    pct_gain = (row["Close"] - prev["Close"]) / prev["Close"]
+    strong_gain = pct_gain >= 0.05
+    vol_surge = row["VOL_RATIO"] >= 2.0
+    closes_near_high = (row["Close"] - row["Low"]) / (row["High"] - row["Low"]) >= 0.7
+    prior_high = df["High"].iloc[idx - 20:idx].max()
+    new_high_breakout = row["Close"] > prior_high
+    uptrend = row["SMA20"] > df["SMA20"].iloc[idx - 5]
+    return bool(strong_gain and vol_surge and closes_near_high and new_high_breakout and uptrend)
+
+
+def signal_pullback_rebound_v2(df, i=-1):
+    """유형2 개선판 — v1은 손실이 수익보다 커서(+3.07% vs -3.35%) 하락 추세를 잡아내고 있었음.
+    조건 강화: (a) 전고점 대비 조정폭을 좁혀 얕은 되돌림만, (b) 당일 저가가 최근 3일 저가보다
+    낮지 않게(추가 신저가 없이 지지 확인), (c) 반등 캔들 몸통 품질, (d) RSI 중립대(패닉/과열 배제)."""
+    idx = i if i >= 0 else len(df) + i
+    if idx < 25:
+        return False
+    row = df.iloc[idx]
+    if pd.isna(row.get("RSI14")):
+        return False
+    window_close = df["Close"].iloc[idx - 20:idx]
+    if window_close.empty:
+        return False
+    recent_high = window_close.max()
+    recent_low = window_close.min()
+    if pd.isna(recent_high) or pd.isna(recent_low) or recent_low <= 0:
+        return False
+    had_strong_rally = (recent_high / recent_low) >= 1.20
+    off_high = row["Close"] / recent_high
+    pulled_back = 0.80 <= off_high <= 0.93
+    bullish_candle = row["Close"] > row["Open"]
+    strong_candle_body = (row["High"] > row["Low"]) and (row["Close"] - row["Low"]) / (row["High"] - row["Low"]) >= 0.5
+    vol5 = df["Volume"].iloc[idx - 5:idx].mean()
+    vol_declining = pd.notna(vol5) and vol5 > 0 and row["Volume"] < vol5 * 0.7
+    support_holding = row["Low"] >= df["Low"].iloc[idx - 3:idx].min()
+    rsi_neutral = 35 <= row["RSI14"] <= 60
+    return bool(
+        had_strong_rally and pulled_back and bullish_candle and strong_candle_body
+        and vol_declining and support_holding and rsi_neutral
+    )
+
+
+# 종가베팅(모멘텀 연속성/조정후반등)은 아직 STRATEGIES에 등록하지 않음 — 백테스트로 검증 후
+# 결과가 괜찮으면 등록(등록되는 순간 build_signals()의 기본 전체 스캔에 실전 반영됨).
+CLOSING_BET_STRATEGIES = {
+    "momentum_continuation": {"name": "종가베팅-모멘텀연속", "signal_fn": signal_momentum_continuation, "min_bars": 25},
+    "pullback_rebound": {"name": "종가베팅-눌림반등", "signal_fn": signal_pullback_rebound, "min_bars": 25},
+    "momentum_continuation_v2": {"name": "종가베팅-모멘텀연속v2", "signal_fn": signal_momentum_continuation_v2, "min_bars": 25},
+    "pullback_rebound_v2": {"name": "종가베팅-눌림반등v2", "signal_fn": signal_pullback_rebound_v2, "min_bars": 25},
+}
+
+
 STRATEGIES = {
     "bb_lower": {"name": "볼린저밴드 하단터치", "signal_fn": signal_bb_lower_touch, "min_bars": 25},
     "rsi_oversold": {"name": "RSI 과매도", "signal_fn": signal_rsi_oversold, "min_bars": 20},
@@ -323,6 +428,10 @@ STRATEGIES = {
     "golden_cross": {"name": "골든크로스", "signal_fn": signal_golden_cross, "min_bars": 25},
     "new_high_20": {"name": "20일 신고가 돌파", "signal_fn": signal_new_high_20, "min_bars": 25},
     "rising_bearish": {"name": "상승음봉", "signal_fn": signal_rising_bearish, "min_bars": 25},
+    # 종가베팅 실전 편입 — 코스피에선 승률<50%(백테스트)였지만 코스닥에선 승률 51~52%·평균수익
+    # 0.7~1.06%로 KOSDAQ150/200/300·2~3년 반복 검증에서 일관됨. 그래서 스캔은 KOSDAQ 전용으로
+    # scan_recommendations.py에서 분리 처리(KOSPI 스캔의 strategy_keys에선 제외).
+    "momentum_continuation_v2": {"name": "종가베팅-모멘텀연속(코스닥)", "signal_fn": signal_momentum_continuation_v2, "min_bars": 25},
 }
 
 # 실전 편입 전략 (README §1) — 더블비는 표본 부족으로 미편입 (README §2)
