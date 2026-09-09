@@ -49,7 +49,7 @@ def main():
 
     for strat in KOSDAQ_ONLY_STRATEGIES:
         trades = backtest_universe(
-            kosdaq_tickers, "KR", strat, hold_days=args.hold_days,
+            kosdaq_tickers, "KR", strat, hold_days=c.get_max_hold_days(strat, args.hold_days),
             require_volume=False, require_liquidity=True,
             years=args.years, progress_cb=progress,
         )

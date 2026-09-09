@@ -1,4 +1,7 @@
-# 백테스트 공용 엔진: 신호 발생일 종가 매수 → 최대 N거래일 보유 → 20일선 도달 시 익절 or 마지막날 강제청산
+# 백테스트 공용 엔진: 신호 발생일 종가 매수 → 손절가 도달 시 즉시 손절, 목표가(20일선 또는
+# 손익비 2:1) 도달 시 익절, 최대 N거래일 지나면 강제청산.
+# 예전엔 손절 체크가 전혀 없어서(20일선 익절만 확인) 백테스트 승률이 실제 라이브 추적
+# (track_recommendations.py, 매일 손절가 체크)보다 부풀려져 있었음 — live와 동일한 규칙으로 수정.
 import pandas as pd
 
 import common as c
@@ -14,18 +17,30 @@ def simulate_trades(df, signal_fn, hold_days=5):
         except Exception:
             continue
 
-        entry_price = df["Close"].iloc[i]
+        entry_price = float(df["Close"].iloc[i])
         entry_date = df.index[i]
         sma20 = df["SMA20"].iloc[i]
+        atr14 = df["ATR14"].iloc[i]
+        stop_loss, target, _ = c.compute_trade_levels(
+            entry_price,
+            float(sma20) if pd.notna(sma20) else None,
+            float(atr14) if pd.notna(atr14) else None,
+        )
 
         exit_price = exit_date = exit_reason = None
         for h in range(1, hold_days + 1):
             j = i + h
             if j >= n:
                 break
-            close_j = df["Close"].iloc[j]
-            if pd.notna(sma20) and close_j >= sma20:
-                exit_price, exit_date, exit_reason = close_j, df.index[j], "take_profit_sma20"
+            low_j = float(df["Low"].iloc[j])
+            close_j = float(df["Close"].iloc[j])
+            if low_j <= stop_loss:
+                # 갭하락으로 시가가 이미 손절가 아래면 시가에 체결(손절가보다 더 나쁠 수 있음).
+                open_j = float(df["Open"].iloc[j])
+                exit_price, exit_date, exit_reason = min(stop_loss, open_j), df.index[j], "stop_loss"
+                break
+            if close_j >= target:
+                exit_price, exit_date, exit_reason = close_j, df.index[j], "take_profit"
                 break
             if h == hold_days:
                 exit_price, exit_date, exit_reason = close_j, df.index[j], "force_close"

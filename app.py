@@ -188,18 +188,21 @@ with tab_reco:
         ) if {"buy_price_min", "buy_price_max"}.issubset(shown.columns) else shown
 
         table_cols = ["우선순위", "date", "market", "code", "name", "strategy_name",
-                      "buy_price", "매수허용범위", "target", "stop_loss", "risk_reward",
+                      "buy_price", "매수허용범위", "suggested_qty", "target", "stop_loss", "risk_reward",
                       "backtest_win_rate", "backtest_avg_return", "avg_holding_days", "buy_window",
                       "news_headline", "news_url"]
         table_cols = [col for col in table_cols if col in shown.columns]
 
-        st.caption("우선순위 = 백테스트 평균수익률 ÷ 평균보유기간(자본효율) 기준, 1위가 가장 유리.")
+        st.caption(
+            "우선순위 = 백테스트 평균수익률 ÷ 평균보유기간(자본효율) 기준, 1위가 가장 유리. "
+            "추천수량 = 계좌의 risk_per_trade_pct%만 손절 시 잃도록 손절폭 기반 계산(설정 탭에서 계좌잔고 확인)."
+        )
         st.dataframe(
             shown[table_cols]
             .rename(columns={
                 "date": "날짜", "market": "시장", "code": "코드", "name": "종목명",
                 "strategy_name": "전략", "buy_price": "매수가", "target": "목표가",
-                "stop_loss": "손절가", "risk_reward": "손익비",
+                "stop_loss": "손절가", "risk_reward": "손익비", "suggested_qty": "추천수량",
                 "backtest_win_rate": "백테스트승률", "backtest_avg_return": "평균수익률",
                 "avg_holding_days": "평균 보유기간", "buy_window": "매수 시간대",
                 "news_headline": "관련뉴스", "news_url": "기사",
@@ -211,6 +214,7 @@ with tab_reco:
                 "목표가": st.column_config.NumberColumn(format="%.2f"),
                 "손절가": st.column_config.NumberColumn(format="%.2f"),
                 "손익비": st.column_config.NumberColumn(format="%.2f"),
+                "추천수량": st.column_config.NumberColumn(format="%d주"),
                 "백테스트승률": st.column_config.ProgressColumn(format="%.1f%%", min_value=0, max_value=100),
                 "평균수익률": st.column_config.NumberColumn(format="%.2f%%"),
                 "평균 보유기간": st.column_config.NumberColumn(format="%.1f일"),
@@ -298,16 +302,20 @@ with tab_track:
         shown_log = shown_log.assign(status=shown_log["status"].map(lambda s: status_label.get(s, s)))
 
         st.caption("우선순위는 보유중(OPEN) 건에만 매겨짐 — 백테스트 평균수익률 ÷ 평균보유기간(자본효율) 기준, 1위가 가장 유리.")
+        track_cols = ["우선순위", "date", "market", "code", "name", "strategy_name", "status",
+                      "buy_price", "current_price", "current_return_pct",
+                      "target", "stop_loss", "exit_date", "exit_price", "realized_return_pct",
+                      "news_headline", "news_url"]
+        track_cols = [col for col in track_cols if col in shown_log.columns]
         st.dataframe(
-            shown_log[["우선순위", "date", "market", "code", "name", "strategy_name", "status",
-                       "buy_price", "current_price", "current_return_pct",
-                       "target", "stop_loss", "exit_date", "exit_price", "realized_return_pct"]]
+            shown_log[track_cols]
             .rename(columns={
                 "date": "추천일", "market": "시장", "code": "코드", "name": "종목명",
                 "strategy_name": "전략", "status": "상태", "buy_price": "매수가",
                 "current_price": "현재가", "current_return_pct": "현재수익률(%)",
                 "target": "목표가", "stop_loss": "손절가", "exit_date": "청산일",
                 "exit_price": "청산가", "realized_return_pct": "실현수익률(%)",
+                "news_headline": "관련뉴스", "news_url": "기사",
             }),
             width="stretch",
             hide_index=True,
@@ -319,6 +327,7 @@ with tab_track:
                 "청산가": st.column_config.NumberColumn(format="%.2f"),
                 "현재수익률(%)": st.column_config.NumberColumn(format="%.2f%%"),
                 "실현수익률(%)": st.column_config.NumberColumn(format="%.2f%%"),
+                "기사": st.column_config.LinkColumn(display_text="🔗 기사"),
             },
         )
 

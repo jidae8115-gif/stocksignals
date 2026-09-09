@@ -1,12 +1,12 @@
 ﻿market,strategy,strategy_name,trades,win_rate,avg_return_pct,holding_days
-KR,bb_lower,볼린저밴드 하단터치,2620,64.31,2.47,7.2
-KR,rsi_oversold,RSI 과매도,1329,66.82,3.22,7.3
-KR,golden_cross,골든크로스,2272,52.86,0.14,2.2
-KR,new_high_20,20일 신고가 돌파,4684,46.65,0.17,1.5
-KR,rising_bearish,상승음봉,13112,51.82,0.25,2.0
-US,bb_lower,볼린저밴드 하단터치,17015,57.17,0.76,6.9
-US,rsi_oversold,RSI 과매도,12982,58.47,0.89,7.2
-US,golden_cross,골든크로스,11541,55.58,0.09,2.2
-US,new_high_20,20일 신고가 돌파,28672,50.61,0.02,1.5
-US,rising_bearish,상승음봉,67782,54.96,0.1,1.9
-KR,momentum_continuation_v2,종가베팅-모멘텀연속(코스닥),1316,50.91,1.04,1.5
+KR,bb_lower,볼린저밴드 하단터치,750,65.87,2.69,6.6
+KR,rsi_oversold,RSI 과매도,294,65.65,3.15,6.8
+KR,golden_cross,골든크로스,517,48.94,1.06,5.7
+KR,new_high_20,20일 신고가 돌파,2599,46.71,0.97,5.7
+KR,rising_bearish,상승음봉,1370,46.93,0.69,6.2
+US,bb_lower,볼린저밴드 하단터치,5782,54.34,0.65,6.1
+US,rsi_oversold,RSI 과매도,3503,55.72,0.74,6.3
+US,golden_cross,골든크로스,1230,51.06,0.41,5.9
+US,new_high_20,20일 신고가 돌파,5655,47.53,0.19,6.0
+US,rising_bearish,상승음봉,5049,53.32,0.62,6.1
+KR,momentum_continuation_v2,종가베팅-모멘텀연속(코스닥),1775,49.18,0.77,1.5

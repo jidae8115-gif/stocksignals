@@ -15,6 +15,7 @@ LOG_COLUMNS = [
     "backtest_win_rate", "backtest_avg_return",
     "status", "current_price", "current_return_pct",
     "exit_date", "exit_price", "realized_return_pct", "last_checked",
+    "news_headline", "news_url",
 ]
 
 
@@ -25,7 +26,7 @@ def load_log():
         df = pd.DataFrame(columns=LOG_COLUMNS)
     # exit_date/status 등은 전부 비어있으면(=한 번도 청산된 적 없으면) float64로 잘못 추론돼
     # 나중에 문자열을 대입할 때 pandas가 경고를 내므로 object로 고정.
-    for col in ("status", "exit_date"):
+    for col in ("status", "exit_date", "news_headline", "news_url"):
         if col in df.columns:
             df[col] = df[col].astype(object)
     return df
@@ -61,6 +62,7 @@ def append_new_recommendations(log_df, latest_df):
             "status": "OPEN", "current_price": row["buy_price"], "current_return_pct": 0.0,
             "exit_date": None, "exit_price": None, "realized_return_pct": None,
             "last_checked": c.now_kst().isoformat(),
+            "news_headline": row.get("news_headline"), "news_url": row.get("news_url"),
         })
 
     if new_rows:
@@ -97,6 +99,7 @@ def update_open_positions(log_df):
             continue
 
         target, stop = float(row["target"]), float(row["stop_loss"])
+        max_hold = c.get_max_hold_days(row["strategy"])
         status, exit_date, exit_price = "OPEN", None, None
 
         for h, (dt, r) in enumerate(forward.iterrows(), start=1):
@@ -108,7 +111,9 @@ def update_open_positions(log_df):
             if r["Close"] >= target:
                 status, exit_date, exit_price = "TARGET_HIT", dt, c.apply_slippage(target)
                 break
-            if h >= 5:
+            if h >= max_hold:
+                # 종가베팅처럼 max_hold_days=1인 전략은 여기서 다음날 시가/종가로 바로 청산되고,
+                # 나머지 전략은 기존과 동일하게 5일째 강제청산.
                 status, exit_date, exit_price = "FORCE_CLOSED", dt, c.apply_slippage(float(r["Close"]))
                 break
 

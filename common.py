@@ -487,11 +487,26 @@ STRATEGIES = {
     # 종가베팅 실전 편입 — 코스피에선 승률<50%(백테스트)였지만 코스닥에선 승률 51~52%·평균수익
     # 0.7~1.06%로 KOSDAQ150/200/300·2~3년 반복 검증에서 일관됨. 그래서 스캔은 KOSDAQ 전용으로
     # scan_recommendations.py에서 분리 처리(KOSPI 스캔의 strategy_keys에선 제외).
-    "momentum_continuation_v2": {"name": "종가베팅-모멘텀연속(코스닥)", "signal_fn": signal_momentum_continuation_v2, "min_bars": 25},
+    # max_hold_days=1 — 이 전략의 핵심은 "당일 종가 매수, 다음날 바로 청산"인데 범용 5일
+    # 보유 엔진에 태우면 목표/손절을 못 맞춘 건들이 5일까지 질질 끌려가며 전략 취지가 사라짐
+    # (실측: 5일 엔진에선 평균보유 5.5일로 늘어나며 승률 43.76%로 하락 — 원래 검증한 1.5일/승률
+    # 50~52%짜리 전략과 다른 물건이 됨). 백테스트·실전 추적 둘 다 이 값을 강제해야 함.
+    "momentum_continuation_v2": {
+        "name": "종가베팅-모멘텀연속(코스닥)", "signal_fn": signal_momentum_continuation_v2,
+        "min_bars": 25, "max_hold_days": 1,
+    },
 }
 
 # 실전 편입 전략 (README §1) — 더블비는 표본 부족으로 미편입 (README §2)
 PRODUCTION_STRATEGIES = {"KR": "bb_lower", "US": "rsi_oversold"}
+
+
+def get_max_hold_days(strategy_key, default=5):
+    """전략별 최대 보유일수 — 대부분 5일(기존 규칙)이지만 종가베팅처럼 하루짜리 전략은
+    STRATEGIES 항목에 max_hold_days로 오버라이드. 백테스트 엔진과 실전 추적
+    (track_recommendations.py) 둘 다 이 값을 써야 같은 규칙으로 동작한다."""
+    spec = STRATEGIES.get(strategy_key, {})
+    return spec.get("max_hold_days", default)
 
 # 신호는 "그날 종가"를 기준으로 계산되므로(RSI/SMA/BB 전부 종가 포함 지표), 장중 조기 스캔은
 # 아직 확정 안 된 값으로 잠정 신호일 수 있음 — 마감 직전에 재확인 후 매수하는 게 백테스트 규칙과 일치.
@@ -628,6 +643,7 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
                     buy_price_min, buy_price_max = compute_entry_range(close)
                     bt_win_rate, bt_avg_return, bt_holding_days = backtest_stats.get((market, key), (None, None, None))
                     priority_score = compute_priority_score(bt_win_rate, bt_avg_return, bt_holding_days)
+                    suggested_qty = position_size(close, stop_loss, market)
                     news = get_recent_news(code, market, limit=1)
                     results.append({
                         "date": df.index[-1].strftime("%Y-%m-%d"),
@@ -647,6 +663,7 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
                         "backtest_avg_return": bt_avg_return,
                         "avg_holding_days": bt_holding_days,
                         "priority_score": priority_score,
+                        "suggested_qty": suggested_qty,
                         "buy_window": buy_window,
                         "vol_ratio": None if pd.isna(last["VOL_RATIO"]) else float(last["VOL_RATIO"]),
                         "rsi14": None if pd.isna(last["RSI14"]) else float(last["RSI14"]),
@@ -659,7 +676,7 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
     cols = ["date", "market", "code", "name", "strategy", "strategy_name", "buy_price",
             "buy_price_min", "buy_price_max", "close",
             "stop_loss", "target", "risk_reward", "backtest_win_rate", "backtest_avg_return",
-            "avg_holding_days", "priority_score", "buy_window", "vol_ratio", "rsi14", "sma20",
+            "avg_holding_days", "priority_score", "suggested_qty", "buy_window", "vol_ratio", "rsi14", "sma20",
             "news_headline", "news_url"]
     # 순위(priority_rank)는 여기서 매기지 않는다 — build_signals()는 KOSPI/KOSDAQ/US처럼
     # 한 번에 일부 유니버스만 스캔하므로, 그날 전체 신호가 다 모인 뒤(app.py 표시 시점,
@@ -669,14 +686,28 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
 
 # ---------- 포지션 사이징 ----------
 
-def position_size(price, market="KR"):
-    """계좌 잔고 대비 최대 포지션 비율(risk.max_position_pct)로 매수 수량 계산."""
+def position_size(price, stop_loss=None, market="KR"):
+    """계좌 잔고 대비 매수 수량 계산 — 두 제약의 더 작은 쪽을 취함:
+    (1) 손절가 기준: 손절이 실제로 발생해도 계좌의 risk_per_trade_pct%만 잃도록(전문 트레이딩의
+        표준 방식 — 예전엔 이 필드가 config.json에 있으면서 코드 어디서도 안 쓰이고 있었음),
+    (2) max_position_pct: 손절폭이 아주 좁아도 한 종목에 계좌를 과도하게 몰아넣지 않도록 하는 상한.
+    stop_loss가 없으면 (1)을 건너뛰고 (2)만 적용(기존 동작과 동일)."""
     if price <= 0:
         return 0
     risk_cfg = CONFIG["risk"]
     balance = CONFIG["account"]["balance_krw"] if market == "KR" else CONFIG["account"]["balance_usd"]
+
     max_position_value = balance * (risk_cfg["max_position_pct"] / 100)
-    return max(int(max_position_value // price), 0)
+    shares_by_cap = int(max_position_value // price)
+
+    if stop_loss is None or stop_loss <= 0 or stop_loss >= price:
+        return max(shares_by_cap, 0)
+
+    risk_amount = balance * (risk_cfg.get("risk_per_trade_pct", 2.0) / 100)
+    per_share_risk = price - stop_loss
+    shares_by_risk = int(risk_amount // per_share_risk)
+
+    return max(min(shares_by_risk, shares_by_cap), 0)
 
 
 # ---------- 장시간 판정 ----------
@@ -822,6 +853,8 @@ def notify_new_signals(df, state_key_cols=("date", "market", "code", "strategy")
                 lines.append(f"백테스트승률 {row['backtest_win_rate']}%")
             if pd.notna(row.get("avg_holding_days")):
                 lines.append(f"평균 보유기간 {row['avg_holding_days']}일 (백테스트 실측)")
+            if pd.notna(row.get("suggested_qty")) and row.get("suggested_qty", 0) > 0:
+                lines.append(f"추천수량 {int(row['suggested_qty'])}주 (계좌 대비 리스크 기반)")
         else:
             lines.append(f"종가 {row['close']}")
         if pd.notna(row.get("news_headline")):
