@@ -244,14 +244,23 @@ with tab_track:
         k5.metric("실현 승률", f"{realized_win_rate}%" if realized_win_rate is not None else "—")
 
         st.write("")
-        status_opts = sorted(df_log["status"].unique())
-        chosen_status = st.multiselect("상태 필터", options=status_opts, default=status_opts)
-        shown_log = df_log[df_log["status"].isin(chosen_status)] if chosen_status else df_log
-
         status_label = {
             "OPEN": "🔵 보유중", "TARGET_HIT": "🟢 목표달성",
             "STOP_HIT": "🔴 손절", "FORCE_CLOSED": "⚪ 강제청산",
         }
+        fc1, fc2 = st.columns(2)
+        date_opts = sorted(df_log["date"].unique(), reverse=True)
+        chosen_dates = fc1.multiselect("추천일 필터", options=date_opts, default=date_opts)
+        status_opts = sorted(df_log["status"].unique())
+        chosen_status = fc2.multiselect(
+            "상태 필터", options=status_opts, default=status_opts,
+            format_func=lambda s: status_label.get(s, s),
+        )
+
+        shown_log = df_log[df_log["date"].isin(chosen_dates)] if chosen_dates else df_log.iloc[0:0]
+        shown_log = shown_log[shown_log["status"].isin(chosen_status)] if chosen_status else shown_log.iloc[0:0]
+        shown_log = shown_log.sort_values("date", ascending=False)
+
         shown_log = shown_log.assign(status=shown_log["status"].map(lambda s: status_label.get(s, s)))
 
         st.dataframe(
