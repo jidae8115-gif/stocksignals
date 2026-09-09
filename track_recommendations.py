@@ -20,8 +20,15 @@ LOG_COLUMNS = [
 
 def load_log():
     if os.path.exists(LOG_PATH):
-        return pd.read_csv(LOG_PATH, dtype={"code": str})
-    return pd.DataFrame(columns=LOG_COLUMNS)
+        df = pd.read_csv(LOG_PATH, dtype={"code": str})
+    else:
+        df = pd.DataFrame(columns=LOG_COLUMNS)
+    # exit_date/status 등은 전부 비어있으면(=한 번도 청산된 적 없으면) float64로 잘못 추론돼
+    # 나중에 문자열을 대입할 때 pandas가 경고를 내므로 object로 고정.
+    for col in ("status", "exit_date"):
+        if col in df.columns:
+            df[col] = df[col].astype(object)
+    return df
 
 
 def append_new_recommendations(log_df, latest_df):
@@ -61,7 +68,9 @@ def update_open_positions(log_df):
     open_idx = log_df.index[log_df["status"] == "OPEN"]
     for idx in open_idx:
         row = log_df.loc[idx]
-        df = c.fetch_ohlcv(row["code"], days=30)
+        # days=30은 fetch_ohlcv 내부의 "60행 미만이면 무효" 기준에 걸려 매번 None이 나오던 버그였음 —
+        # 기본값(약 500일치)을 써서 항상 충분한 데이터를 받도록 수정.
+        df = c.fetch_ohlcv(row["code"])
         if df is None:
             continue
 
@@ -85,8 +94,18 @@ def update_open_positions(log_df):
                 break
 
         last_close = float(df["Close"].iloc[-1])
-        log_df.at[idx, "current_price"] = last_close
-        log_df.at[idx, "current_return_pct"] = round((last_close - row["buy_price"]) / row["buy_price"] * 100, 2)
+        realtime_price = c.get_realtime_price(row["code"], row["market"])
+        current_price = realtime_price if realtime_price is not None else last_close
+
+        # 일봉엔 아직 당일 값이 안 반영됐을 수 있으므로, 그때까지 OPEN이면 실시간가로 즉시 판정.
+        if status == "OPEN" and realtime_price is not None:
+            if realtime_price <= stop:
+                status, exit_date, exit_price = "STOP_HIT", c.now_kst(), stop
+            elif realtime_price >= target:
+                status, exit_date, exit_price = "TARGET_HIT", c.now_kst(), target
+
+        log_df.at[idx, "current_price"] = current_price
+        log_df.at[idx, "current_return_pct"] = round((current_price - row["buy_price"]) / row["buy_price"] * 100, 2)
         log_df.at[idx, "last_checked"] = c.now_kst().isoformat()
 
         if status != "OPEN":

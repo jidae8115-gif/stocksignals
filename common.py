@@ -26,6 +26,11 @@ try:
 except ImportError:
     fdr = None
 
+try:
+    import yfinance as yf
+except ImportError:
+    yf = None
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 PENDING_PATH = os.path.join(BASE_DIR, "pending_notifications.json")
@@ -155,6 +160,23 @@ def fetch_ohlcv(ticker, start=None, end=None, days=500):
 
     _OHLCV_CACHE[cache_key] = df
     return df
+
+
+def get_realtime_price(code, market):
+    """실시간(지연 포함) 현재가를 야후 파이낸스로 조회 — fetch_ohlcv()의 일봉 종가는 장중에
+    당일 값이 아직 반영 안 될 수 있어, 보유 포지션의 목표가/손절가를 그 자리에서 판정하려면
+    실시간 가격이 필요함. 실패하면 None을 반환하며, 호출부는 일봉 종가로 폴백해야 한다."""
+    if yf is None:
+        return None
+    candidates = [code] if market == "US" else [f"{code}.KS", f"{code}.KQ"]
+    for ticker in candidates:
+        try:
+            price = yf.Ticker(ticker).fast_info["last_price"]
+            if price and price > 0:
+                return float(price)
+        except Exception:
+            continue
+    return None
 
 
 # ---------- 지표 계산 ----------
