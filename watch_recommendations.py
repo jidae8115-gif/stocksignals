@@ -56,15 +56,26 @@ def main():
     print(f"=== watch_recommendations.py 실행 {c.now_kst().isoformat()} (KR={kr_active} US={us_active}) ===")
 
     try:
+        latest_path = os.path.join(c.BASE_DIR, "latest_recommendations.csv")
+        try:
+            prev_df = pd.read_csv(latest_path, dtype={"code": str}) if os.path.exists(latest_path) else pd.DataFrame()
+        except Exception:
+            prev_df = pd.DataFrame()
+
+        # 장이 닫힌 시장은 스캔하지 않으므로, 그 시장의 직전 스캔 결과를 그대로 이어서 보여준다.
+        # (안 그러면 예: 한국장 마감 직후 실행에서 US만 다시 써서 KR 신호가 통째로 사라짐)
         frames = []
         if kr_active:
             frames.append(scan("KR"))
+        elif not prev_df.empty and "market" in prev_df.columns:
+            frames.append(prev_df[prev_df["market"] == "KR"])
         if us_active:
             frames.append(scan("US"))
+        elif not prev_df.empty and "market" in prev_df.columns:
+            frames.append(prev_df[prev_df["market"] == "US"])
 
         all_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
-        latest_path = os.path.join(c.BASE_DIR, "latest_recommendations.csv")
         all_df.to_csv(latest_path, index=False, encoding="utf-8-sig")
         save_status(len(all_df), kr_active=kr_active, us_active=us_active)
 
