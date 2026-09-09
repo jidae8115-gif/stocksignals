@@ -574,6 +574,17 @@ def apply_slippage(price):
     return round(price * (1 - pct / 100), 2)
 
 
+def compute_priority_score(win_rate, avg_return, holding_days=None):
+    """여러 신호가 동시에 뜰 때 뭘 먼저 볼지 정하기 위한 우선순위 점수.
+    단순히 승률/평균수익률이 높은 걸 위로 올리는 게 아니라, '하루 들고 있을 때 평균 얼마나
+    버는지'(평균수익률 ÷ 평균보유기간)로 정규화 — 보유기간이 다른 전략끼리도 자본효율 기준으로
+    공정하게 비교되게 함. 백테스트 데이터가 없는 신호는 항상 맨 뒤로 밀려나도록 None 반환."""
+    if pd.isna(avg_return):
+        return None
+    days = holding_days if (holding_days is not None and pd.notna(holding_days) and holding_days > 0) else 1
+    return round(avg_return / days, 3)
+
+
 def build_signals(tickers, market, strategy_keys=None, require_volume=True, require_liquidity=True, progress_cb=None):
     """종목 리스트를 스캔해서 신호 발생 종목을 DataFrame으로 반환.
 
@@ -616,6 +627,7 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
                     stop_loss, target, risk_reward = compute_trade_levels(close, sma20, atr14)
                     buy_price_min, buy_price_max = compute_entry_range(close)
                     bt_win_rate, bt_avg_return, bt_holding_days = backtest_stats.get((market, key), (None, None, None))
+                    priority_score = compute_priority_score(bt_win_rate, bt_avg_return, bt_holding_days)
                     news = get_recent_news(code, market, limit=1)
                     results.append({
                         "date": df.index[-1].strftime("%Y-%m-%d"),
@@ -634,6 +646,7 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
                         "backtest_win_rate": bt_win_rate,
                         "backtest_avg_return": bt_avg_return,
                         "avg_holding_days": bt_holding_days,
+                        "priority_score": priority_score,
                         "buy_window": buy_window,
                         "vol_ratio": None if pd.isna(last["VOL_RATIO"]) else float(last["VOL_RATIO"]),
                         "rsi14": None if pd.isna(last["RSI14"]) else float(last["RSI14"]),
@@ -646,8 +659,11 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
     cols = ["date", "market", "code", "name", "strategy", "strategy_name", "buy_price",
             "buy_price_min", "buy_price_max", "close",
             "stop_loss", "target", "risk_reward", "backtest_win_rate", "backtest_avg_return",
-            "avg_holding_days", "buy_window", "vol_ratio", "rsi14", "sma20",
+            "avg_holding_days", "priority_score", "buy_window", "vol_ratio", "rsi14", "sma20",
             "news_headline", "news_url"]
+    # 순위(priority_rank)는 여기서 매기지 않는다 — build_signals()는 KOSPI/KOSDAQ/US처럼
+    # 한 번에 일부 유니버스만 스캔하므로, 그날 전체 신호가 다 모인 뒤(app.py 표시 시점,
+    # notify_new_signals의 신규 신호 묶음)에 매겨야 순위가 뒤섞이지 않는다.
     return pd.DataFrame(results, columns=cols)
 
 
@@ -781,8 +797,21 @@ def notify_new_signals(df, state_key_cols=("date", "market", "code", "strategy")
         return df.iloc[0:0]
 
     new_df = pd.DataFrame(new_rows)
-    for _, row in new_df.iterrows():
-        lines = [f"[{row['market']}] {row['strategy_name']} 신호", f"{row['name']}({row['code']})"]
+    # 이번에 새로 뜬 신호끼리 우선순위 스코어로 순위를 매겨(1위=자본효율 최고) 메시지에 표시 —
+    # 한 번에 여러 종목이 뜨면 뭐부터 볼지 바로 알 수 있게.
+    if "priority_score" in new_df.columns:
+        ranked = new_df.sort_values("priority_score", ascending=False, na_position="last")
+        rank_map = {idx: i + 1 for i, idx in enumerate(ranked.index)}
+    else:
+        rank_map = {}
+    total_new = len(new_df)
+
+    for idx, row in new_df.iterrows():
+        rank = rank_map.get(idx)
+        header = f"[{row['market']}] {row['strategy_name']} 신호"
+        if rank and total_new > 1:
+            header += f" (우선순위 {rank}/{total_new}위)"
+        lines = [header, f"{row['name']}({row['code']})"]
         if "buy_price" in row and pd.notna(row.get("buy_price")):
             lines.append(f"매수가 {row['buy_price']} / 목표 {row.get('target')} / 손절 {row.get('stop_loss')}")
             if pd.notna(row.get("buy_price_min")) and pd.notna(row.get("buy_price_max")):

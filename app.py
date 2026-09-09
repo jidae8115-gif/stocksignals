@@ -178,19 +178,22 @@ with tab_reco:
             label_visibility="collapsed", placeholder="전략 선택...", key=f"{key_prefix}_strategy",
         )
         shown = df[df["strategy_name"].isin(chosen)] if chosen else df
-        shown = shown.sort_values("backtest_win_rate", ascending=False, na_position="last")
+        sort_col = "priority_score" if "priority_score" in shown.columns else "backtest_win_rate"
+        shown = shown.sort_values(sort_col, ascending=False, na_position="last").reset_index(drop=True)
+        shown.insert(0, "우선순위", range(1, len(shown) + 1))
 
         shown = shown.assign(
             매수허용범위=shown["buy_price_min"].map(lambda v: f"{v:g}") + " ~ "
             + shown["buy_price_max"].map(lambda v: f"{v:g}")
         ) if {"buy_price_min", "buy_price_max"}.issubset(shown.columns) else shown
 
-        table_cols = ["date", "market", "code", "name", "strategy_name",
+        table_cols = ["우선순위", "date", "market", "code", "name", "strategy_name",
                       "buy_price", "매수허용범위", "target", "stop_loss", "risk_reward",
                       "backtest_win_rate", "backtest_avg_return", "avg_holding_days", "buy_window",
                       "news_headline", "news_url"]
         table_cols = [col for col in table_cols if col in shown.columns]
 
+        st.caption("우선순위 = 백테스트 평균수익률 ÷ 평균보유기간(자본효율) 기준, 1위가 가장 유리.")
         st.dataframe(
             shown[table_cols]
             .rename(columns={
@@ -275,10 +278,28 @@ with tab_track:
         shown_log = shown_log[shown_log["status"].isin(chosen_status)] if chosen_status else shown_log.iloc[0:0]
         shown_log = shown_log.sort_values("date", ascending=False)
 
+        # 보유중(OPEN) 건만 우선순위를 매긴다 — 이미 청산된 건 순위가 의미 없으므로 비워둠.
+        # 백테스트 요약에서 (시장,전략)별 평균보유기간을 찾아 자본효율 스코어를 계산.
+        bt_stats = c.load_backtest_stats()
+
+        def _priority(row):
+            if row["status"] != "OPEN":
+                return None
+            _, _, holding_days = bt_stats.get((row["market"], row["strategy"]), (None, None, None))
+            return c.compute_priority_score(row.get("backtest_win_rate"), row.get("backtest_avg_return"), holding_days)
+
+        shown_log = shown_log.assign(priority_score=shown_log.apply(_priority, axis=1))
+        open_ranked = shown_log[shown_log["status"] == "OPEN"].sort_values(
+            "priority_score", ascending=False, na_position="last"
+        )
+        rank_map = {idx: i + 1 for i, idx in enumerate(open_ranked.index)}
+        shown_log = shown_log.assign(우선순위=shown_log.index.map(rank_map.get))
+
         shown_log = shown_log.assign(status=shown_log["status"].map(lambda s: status_label.get(s, s)))
 
+        st.caption("우선순위는 보유중(OPEN) 건에만 매겨짐 — 백테스트 평균수익률 ÷ 평균보유기간(자본효율) 기준, 1위가 가장 유리.")
         st.dataframe(
-            shown_log[["date", "market", "code", "name", "strategy_name", "status",
+            shown_log[["우선순위", "date", "market", "code", "name", "strategy_name", "status",
                        "buy_price", "current_price", "current_return_pct",
                        "target", "stop_loss", "exit_date", "exit_price", "realized_return_pct"]]
             .rename(columns={
