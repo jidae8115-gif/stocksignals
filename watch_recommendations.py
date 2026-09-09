@@ -1,6 +1,7 @@
 # 6개 전략(실전 5개 + 더블비) 통합 추천종목 30분 감시봇 — 장시간 아니면 즉시 스킵
 # 알림 채널: 텔레그램(신규 신호만, notified_state.json으로 중복 방지) + 대시보드(app.py) —
 # 매 실행마다 latest_recommendations.csv + last_scan_recommendations.json 갱신
+import json
 import os
 import traceback
 from datetime import datetime
@@ -11,9 +12,42 @@ import common as c
 from scan_recommendations import scan, save_status, STATUS_PATH  # noqa: F401 (STATUS_PATH re-export)
 
 
+def load_prev_status():
+    if not os.path.exists(STATUS_PATH):
+        return None
+    try:
+        with open(STATUS_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def notify_if_market_closed_empty(prev_status, kr_active, us_active):
+    """직전 실행엔 열려있던 장이 이번 실행엔 닫혔는데, 그날 해당 시장 신호가 하나도
+    없었으면 '신호 없음'을 텔레그램으로 알림 — 조용하면 봇이 죽은 건지 진짜 없는 건지
+    구분이 안 된다는 피드백에 따라 추가."""
+    if prev_status is None:
+        return
+    latest_path = os.path.join(c.BASE_DIR, "latest_recommendations.csv")
+    try:
+        df = pd.read_csv(latest_path, dtype={"code": str}) if os.path.exists(latest_path) else pd.DataFrame()
+    except Exception:
+        df = pd.DataFrame()
+
+    for market, status_key, label in (("KR", "kr_active", "🇰🇷 한국장"), ("US", "us_active", "🇺🇸 미국장")):
+        was_active = prev_status.get(status_key)
+        is_active = kr_active if market == "KR" else us_active
+        if was_active and not is_active:
+            has_signal = (not df.empty) and (df["market"] == market).any()
+            if not has_signal:
+                c.send_telegram(f"📭 {label} 마감 — 오늘 신규 추천 신호 없음.")
+
+
 def main():
     kr_active = c.is_market_hours("KR")
     us_active = c.is_market_hours("US")
+
+    notify_if_market_closed_empty(load_prev_status(), kr_active, us_active)
 
     if not kr_active and not us_active:
         print(f"{c.now_kst().isoformat()} 장시간 아님 — 스킵")
