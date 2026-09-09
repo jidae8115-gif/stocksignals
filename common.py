@@ -31,6 +31,11 @@ try:
 except ImportError:
     yf = None
 
+try:
+    from deep_translator import GoogleTranslator
+except ImportError:
+    GoogleTranslator = None
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 PENDING_PATH = os.path.join(BASE_DIR, "pending_notifications.json")
@@ -179,10 +184,24 @@ def get_realtime_price(code, market):
     return None
 
 
-def get_recent_news(code, market, limit=3):
+def translate_to_korean(text):
+    """영문 텍스트를 한국어로 번역(비공식 구글 번역 래퍼, API키 불필요).
+    실패하면(네트워크 오류, 차단 등) 원문을 그대로 반환 — 번역은 있으면 좋은 부가기능이라
+    실패했다고 뉴스 표시 자체를 막으면 안 됨."""
+    if GoogleTranslator is None or not text:
+        return text
+    try:
+        translated = GoogleTranslator(source="en", target="ko").translate(text)
+        return translated or text
+    except Exception:
+        return text
+
+
+def get_recent_news(code, market, limit=3, translate=True):
     """야후 파이낸스에서 종목 관련 최근 뉴스 헤드라인을 가져온다(무료 소스라 커버리지가
     제한적이고, 특히 코스닥 소형주는 종목 전용 뉴스가 거의 없을 수 있음 — 그런 경우와
-    조회 실패 모두 조용히 빈 리스트를 반환하며, 호출부는 이를 '뉴스 없음'으로 처리한다."""
+    조회 실패 모두 조용히 빈 리스트를 반환하며, 호출부는 이를 '뉴스 없음'으로 처리한다.
+    translate=True면 요약(summary, 있으면)을 우선으로 제목과 함께 한국어로 번역해서 반환."""
     if yf is None:
         return []
     candidates = [code] if market == "US" else [f"{code}.KS", f"{code}.KQ"]
@@ -195,10 +214,20 @@ def get_recent_news(code, market, limit=3):
             for item in items[:limit]:
                 content = item.get("content", item)
                 title = content.get("title")
+                summary = content.get("summary") or ""
                 url = (content.get("canonicalUrl") or {}).get("url") or (content.get("clickThroughUrl") or {}).get("url")
                 provider = (content.get("provider") or {}).get("displayName", "")
-                if title:
-                    out.append({"title": title, "url": url, "provider": provider})
+                if not title:
+                    continue
+                # 요약이 있으면 요약을(더 설명적), 없으면 제목을 대표 텍스트로 사용.
+                summary_en = summary if summary else title
+                summary_ko = translate_to_korean(summary_en) if translate else summary_en
+                title_ko = translate_to_korean(title) if translate else title
+                out.append({
+                    "title": title, "title_ko": title_ko,
+                    "summary": summary_en, "summary_ko": summary_ko,
+                    "url": url, "provider": provider,
+                })
             if out:
                 return out
         except Exception:
@@ -609,7 +638,7 @@ def build_signals(tickers, market, strategy_keys=None, require_volume=True, requ
                         "vol_ratio": None if pd.isna(last["VOL_RATIO"]) else float(last["VOL_RATIO"]),
                         "rsi14": None if pd.isna(last["RSI14"]) else float(last["RSI14"]),
                         "sma20": sma20,
-                        "news_headline": news[0]["title"] if news else None,
+                        "news_headline": news[0]["summary_ko"] if news else None,
                         "news_url": news[0]["url"] if news else None,
                     })
             except Exception:
