@@ -6,13 +6,13 @@
 
 ## 구조
 
-- 리포지토리: https://github.com/jidae8115-gif/stocksignals (비공개)
-- `.github/workflows/recommendations-watch.yml`: 매 30분마다 실행(cron `*/30 * * * *`).
+- 리포지토리: https://github.com/jidae8115-gif/stocksignals (공개 — Actions 무료 시간 무제한)
+- `.github/workflows/recommendations-watch.yml`: 매 5분마다 실행(cron `*/5 * * * *`, GitHub Actions 스케줄 최소 간격).
   `watch_recommendations.py`가 장시간 아니면 자동 스킵하는 로직은 그대로 유지.
   결과(`latest_recommendations.csv`, `last_scan_recommendations.json`)를 리포지토리에 커밋해서 상태 유지.
-- `.github/workflows/track-recommendations.yml`: 매일 07:00 KST(cron `0 22 * * *`, UTC 기준) 실행.
-  `track_recommendations.py`로 목표가/손절가 도달 여부 판정 + `recommendations_log.csv` 커밋 +
-  구글 드라이브 "주식" 폴더의 시트 자동 동기화.
+- `.github/workflows/track-recommendations.yml`: 15분마다 실행(cron `*/15 * * * *`).
+  `track_recommendations.py`로 목표가/손절가 도달 여부 판정 + 도달 시 텔레그램 알림(🎯 목표가/🛑 손절가/⏱️ 강제청산) +
+  `recommendations_log.csv` 커밋 + 구글 드라이브 "주식" 폴더의 시트 자동 동기화.
 - 두 워크플로 모두 `workflow_dispatch`로 수동 실행 가능 (Actions 탭 → 워크플로 선택 → Run workflow).
 
 ## 자격증명
@@ -47,6 +47,4 @@ schtasks /change /tn "TrackRecommendations" /enable
 
 - GitHub 개인 액세스 토큰(PAT)은 리포지토리 생성·시크릿 등록 때 1회 사용. 만료되면(90일) 재발급 필요
   — 이후 GitHub Actions 자체 실행에는 PAT가 필요 없음(내장 `GITHUB_TOKEN` 사용).
-- Actions 무료 사용량: 비공개 리포지토리 기준 월 2,000분. RecommendationsWatch(30분마다, 1회 약 3~5분)
-  기준 하루 약 15~20회 실행 × 4~5분 ≈ 하루 60~100분, 한 달이면 무료 한도에 걸릴 수 있음 — 사용량이
-  부족해지면 [Settings → Billing](https://github.com/settings/billing)에서 확인하고 주기를 늘리는 것을 고려.
+- Actions 무료 사용량: 공개 리포지토리는 무제한이라 5분 주기(RecommendationsWatch)로 돌려도 과금 걱정 없음.

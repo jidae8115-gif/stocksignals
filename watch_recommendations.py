@@ -1,4 +1,4 @@
-# 6개 전략(실전 5개 + 더블비) 통합 추천종목 30분 감시봇 — 장시간 아니면 즉시 스킵
+# 6개 전략(실전 5개 + 더블비) 통합 추천종목 5분 감시봇 — 장시간 아니면 즉시 스킵
 # 알림 채널: 텔레그램(신규 신호만, notified_state.json으로 중복 방지) + 대시보드(app.py) —
 # 매 실행마다 latest_recommendations.csv + last_scan_recommendations.json 갱신
 import json

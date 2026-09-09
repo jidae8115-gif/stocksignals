@@ -2,11 +2,15 @@ name: TrackRecommendations
 
 on:
   schedule:
-    - cron: "0 22 * * *"   # 매일 07:00 KST (=UTC 22:00 전날) — 한국장·미국장 둘 다 마감 이후
+    - cron: "*/15 * * * *"   # 15분마다 — 목표가/손절가 도달 시 실시간에 가깝게 텔레그램 알림
   workflow_dispatch: {}
 
 permissions:
   contents: write
+
+concurrency:
+  group: track-recommendations
+  cancel-in-progress: false
 
 env:
   TZ: Asia/Seoul

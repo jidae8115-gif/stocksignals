@@ -2,7 +2,7 @@ name: RecommendationsWatch
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/5 * * * *"   # GitHub Actions 스케줄 최소 간격(5분) — 공개 저장소라 Actions 무료 시간 무제한
   workflow_dispatch: {}
 
 permissions:

@@ -122,11 +122,11 @@ with st.sidebar:
         badges += pill("🇺🇸 개장" if status.get("us_active") else "🇺🇸 마감", "green" if status.get("us_active") else "gray")
         st.markdown(badges, unsafe_allow_html=True)
 
-        stalled = bool(status.get("error")) or age_min > 45
+        stalled = bool(status.get("error")) or age_min > 15
         if status.get("error"):
             st.error(f"스캔 실패: {status['error']}")
-        elif age_min > 45:
-            st.warning("45분 이상 지났습니다 — 자동 스캔 확인 필요")
+        elif age_min > 15:
+            st.warning("15분 이상 지났습니다 — 자동 스캔 확인 필요")
         else:
             st.success("정상 작동 중")
 
@@ -149,7 +149,7 @@ tab_reco, tab_track, tab_signals, tab_backtest, tab_config = st.tabs(
 with tab_reco:
     with st.expander("ℹ️ 전략 설명 및 계산 기준"):
         st.caption(
-            "KOSPI100+S&P500 매 30분 자동 스캔(RecommendationsWatch, 장시간 아니면 스킵) — "
+            "KOSPI100+S&P500 매 5분 자동 스캔(RecommendationsWatch, 장시간 아니면 스킵) — "
             "볼린저밴드 하단터치/RSI과매도/골든크로스/20일신고가돌파/상승음봉(실전 5개) + 더블비(표본부족으로 미편입, 참고용). "
             "매수가는 신호일 종가, 손절가는 진입가-1.5×ATR(14), 목표가는 20일선(위에 있을 때) 또는 손익비 2:1 기준. "
             "백테스트승률/평균수익률은 최근 backtest_swing.py·backtest_doubleb.py 실행 결과(같은 시장·전략)에서 가져옴 — "

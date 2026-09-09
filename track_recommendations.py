@@ -90,12 +90,28 @@ def update_open_positions(log_df):
         log_df.at[idx, "last_checked"] = c.now_kst().isoformat()
 
         if status != "OPEN":
+            realized_pct = round((exit_price - row["buy_price"]) / row["buy_price"] * 100, 2)
             log_df.at[idx, "status"] = status
             log_df.at[idx, "exit_date"] = exit_date.strftime("%Y-%m-%d")
             log_df.at[idx, "exit_price"] = exit_price
-            log_df.at[idx, "realized_return_pct"] = round((exit_price - row["buy_price"]) / row["buy_price"] * 100, 2)
+            log_df.at[idx, "realized_return_pct"] = realized_pct
+            notify_exit(row, status, exit_price, realized_pct)
 
     return log_df
+
+
+def notify_exit(row, status, exit_price, realized_pct):
+    """OPEN 포지션이 목표가/손절가 도달 또는 강제청산으로 종료됐을 때 텔레그램 알림."""
+    icon = {"TARGET_HIT": "🎯", "STOP_HIT": "🛑", "FORCE_CLOSED": "⏱️"}.get(status, "📌")
+    label = {"TARGET_HIT": "목표가 도달 (수익 실현)", "STOP_HIT": "손절가 도달",
+              "FORCE_CLOSED": "보유기간 만료 강제청산"}.get(status, status)
+    sign = "+" if realized_pct >= 0 else ""
+    lines = [
+        f"{icon} {label}",
+        f"[{row['market']}] {row['name']}({row['code']}) · {row['strategy_name']}",
+        f"매수가 {row['buy_price']} → 청산가 {exit_price} ({sign}{realized_pct}%)",
+    ]
+    c.send_telegram("\n".join(lines))
 
 
 def main():
