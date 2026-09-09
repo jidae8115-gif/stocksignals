@@ -157,33 +157,26 @@ with tab_reco:
         )
         st.caption(f"🇰🇷 한국 매수 시간대: {c.BUY_WINDOW['KR']}  ·  🇺🇸 미국 매수 시간대: {c.BUY_WINDOW['US']}")
 
-    df_reco, path_reco = load_csv("latest_recommendations.csv")
-    if df_reco is None or df_reco.empty:
-        st.info("현재 신호 없음.")
-    else:
-        kr_n = int((df_reco["market"] == "KR").sum())
-        us_n = int((df_reco["market"] == "US").sum())
-        avg_wr = df_reco["backtest_win_rate"].mean()
-        avg_rr = df_reco["risk_reward"].mean()
+    def render_reco_table(df, key_prefix):
+        if df.empty:
+            st.info("현재 신호 없음.")
+            return
 
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("전체 신호", f"{len(df_reco)}건", f"🇰🇷{kr_n} · 🇺🇸{us_n}")
+        avg_wr = df["backtest_win_rate"].mean()
+        avg_rr = df["risk_reward"].mean()
+
+        k1, k2, k3 = st.columns(3)
+        k1.metric("신호 건수", f"{len(df)}건")
         k2.metric("평균 백테스트승률", f"{avg_wr:.1f}%" if pd.notna(avg_wr) else "—")
         k3.metric("평균 손익비", f"{avg_rr:.2f}" if pd.notna(avg_rr) else "—")
-        k4.metric("전략 종류", f"{df_reco['strategy_name'].nunique()}개")
 
         st.write("")
-        strategy_opts = sorted(df_reco["strategy_name"].unique())
-        fc1, fc2 = st.columns([3, 1])
-        chosen = fc1.multiselect(
+        strategy_opts = sorted(df["strategy_name"].unique())
+        chosen = st.multiselect(
             "전략 필터", options=strategy_opts, default=strategy_opts,
-            label_visibility="collapsed", placeholder="전략 선택...",
+            label_visibility="collapsed", placeholder="전략 선택...", key=f"{key_prefix}_strategy",
         )
-        market_choice = fc2.selectbox("시장", options=["전체", "KR", "US"], label_visibility="collapsed")
-
-        shown = df_reco[df_reco["strategy_name"].isin(chosen)] if chosen else df_reco
-        if market_choice != "전체":
-            shown = shown[shown["market"] == market_choice]
+        shown = df[df["strategy_name"].isin(chosen)] if chosen else df
         shown = shown.sort_values("backtest_win_rate", ascending=False, na_position="last")
 
         shown = shown.assign(
@@ -218,6 +211,20 @@ with tab_reco:
         )
         st.caption(f"매수허용범위 = 신호가 대비 ±{c.CONFIG.get('risk', {}).get('entry_tolerance_pct', 0.5)}% — 딱 그 가격이 아니어도 이 범위 안이면 매수 유효.")
 
+    df_reco, path_reco = load_csv("latest_recommendations.csv")
+    if df_reco is None or df_reco.empty:
+        st.info("현재 신호 없음.")
+    else:
+        kr_n = int((df_reco["market"] == "KR").sum())
+        us_n = int((df_reco["market"] == "US").sum())
+        sub_all, sub_kr, sub_us = st.tabs([f"전체 ({len(df_reco)})", f"🇰🇷 한국 ({kr_n})", f"🇺🇸 미국 ({us_n})"])
+        with sub_all:
+            render_reco_table(df_reco, "reco_all")
+        with sub_kr:
+            render_reco_table(df_reco[df_reco["market"] == "KR"], "reco_kr")
+        with sub_us:
+            render_reco_table(df_reco[df_reco["market"] == "US"], "reco_us")
+
 # ---------- 성과추적 ----------
 with tab_track:
     st.caption(
@@ -225,12 +232,18 @@ with tab_track:
         "5거래일 강제청산(FORCE_CLOSED) 중 하나가 발생하면 청산 처리, 아직이면 OPEN으로 계속 갱신."
     )
 
-    df_log, path_log = load_csv("recommendations_log.csv")
-    if df_log is None or df_log.empty:
-        st.info("아직 추적 기록이 없습니다. 추천종목이 1건 이상 나온 뒤 사이드바에서 추적을 갱신하세요.")
-    else:
-        open_n = int((df_log["status"] == "OPEN").sum())
-        closed = df_log[df_log["status"] != "OPEN"]
+    status_label = {
+        "OPEN": "🔵 보유중", "TARGET_HIT": "🟢 목표달성",
+        "STOP_HIT": "🔴 손절", "FORCE_CLOSED": "⚪ 강제청산",
+    }
+
+    def render_track_table(df, key_prefix):
+        if df.empty:
+            st.info("해당 조건의 추적 기록이 없습니다.")
+            return
+
+        open_n = int((df["status"] == "OPEN").sum())
+        closed = df[df["status"] != "OPEN"]
         target_n = int((closed["status"] == "TARGET_HIT").sum())
         stop_n = int((closed["status"] == "STOP_HIT").sum())
         force_n = int((closed["status"] == "FORCE_CLOSED").sum())
@@ -244,20 +257,16 @@ with tab_track:
         k5.metric("실현 승률", f"{realized_win_rate}%" if realized_win_rate is not None else "—")
 
         st.write("")
-        status_label = {
-            "OPEN": "🔵 보유중", "TARGET_HIT": "🟢 목표달성",
-            "STOP_HIT": "🔴 손절", "FORCE_CLOSED": "⚪ 강제청산",
-        }
         fc1, fc2 = st.columns(2)
-        date_opts = sorted(df_log["date"].unique(), reverse=True)
-        chosen_dates = fc1.multiselect("추천일 필터", options=date_opts, default=date_opts)
-        status_opts = sorted(df_log["status"].unique())
+        date_opts = sorted(df["date"].unique(), reverse=True)
+        chosen_dates = fc1.multiselect("추천일 필터", options=date_opts, default=date_opts, key=f"{key_prefix}_date")
+        status_opts = sorted(df["status"].unique())
         chosen_status = fc2.multiselect(
             "상태 필터", options=status_opts, default=status_opts,
-            format_func=lambda s: status_label.get(s, s),
+            format_func=lambda s: status_label.get(s, s), key=f"{key_prefix}_status",
         )
 
-        shown_log = df_log[df_log["date"].isin(chosen_dates)] if chosen_dates else df_log.iloc[0:0]
+        shown_log = df[df["date"].isin(chosen_dates)] if chosen_dates else df.iloc[0:0]
         shown_log = shown_log[shown_log["status"].isin(chosen_status)] if chosen_status else shown_log.iloc[0:0]
         shown_log = shown_log.sort_values("date", ascending=False)
 
@@ -286,6 +295,20 @@ with tab_track:
                 "실현수익률(%)": st.column_config.NumberColumn(format="%.2f%%"),
             },
         )
+
+    df_log, path_log = load_csv("recommendations_log.csv")
+    if df_log is None or df_log.empty:
+        st.info("아직 추적 기록이 없습니다. 추천종목이 1건 이상 나온 뒤 사이드바에서 추적을 갱신하세요.")
+    else:
+        kr_n = int((df_log["market"] == "KR").sum())
+        us_n = int((df_log["market"] == "US").sum())
+        sub_all, sub_kr, sub_us = st.tabs([f"전체 ({len(df_log)})", f"🇰🇷 한국 ({kr_n})", f"🇺🇸 미국 ({us_n})"])
+        with sub_all:
+            render_track_table(df_log, "track_all")
+        with sub_kr:
+            render_track_table(df_log[df_log["market"] == "KR"], "track_kr")
+        with sub_us:
+            render_track_table(df_log[df_log["market"] == "US"], "track_us")
 
 # ---------- 실전 신호 ----------
 with tab_signals:
