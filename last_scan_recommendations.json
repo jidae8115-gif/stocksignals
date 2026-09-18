@@ -1,7 +1,7 @@
 {
-  "last_run": "2026-09-18T06:31:20.918833",
-  "kr_active": false,
-  "us_active": true,
-  "signal_count": 24,
+  "last_run": "2026-09-18T09:08:07.162593",
+  "kr_active": true,
+  "us_active": false,
+  "signal_count": 20,
   "error": null
 }
