@@ -152,7 +152,7 @@ with tab_reco:
             "KOSPI100+KOSDAQ150+S&P500 매 5분 자동 스캔(RecommendationsWatch, 장시간 아니면 스킵) — "
             "볼린저밴드 하단터치/RSI과매도/골든크로스/20일신고가돌파/상승음봉(실전 5개) + 더블비(표본부족으로 미편입, 참고용) "
             "+ 종가베팅-모멘텀연속(코스닥 전용, 코스피에선 검증 안 됨). "
-            "매수가는 신호일 종가, 손절가는 진입가-1.5×ATR(14), 목표가는 20일선(위에 있을 때) 또는 손익비 2:1 기준. "
+            "매수가는 신호일 종가, 손절가는 진입가-2.5×ATR(14), 목표가는 20일선(위에 있을 때) 또는 진입가+3×ATR(14) 기준. "
             "백테스트승률/평균수익률/평균보유기간은 최근 backtest_swing.py·backtest_doubleb.py 실행 결과(같은 시장·전략)에서 가져옴 — "
             "backtest_*.py를 다시 돌리면 최신 수치로 갱신됨. 관련뉴스는 야후 파이낸스 무료 뉴스라 소형주는 안 뜰 수 있음(참고용)."
         )
@@ -259,7 +259,9 @@ with tab_track:
         target_n = int((closed["status"] == "TARGET_HIT").sum())
         stop_n = int((closed["status"] == "STOP_HIT").sum())
         force_n = int((closed["status"] == "FORCE_CLOSED").sum())
-        realized_win_rate = round(target_n / len(closed) * 100, 1) if len(closed) > 0 else None
+        # 백테스트승률과 같은 기준(수익 난 거래 비율) — 목표가 도달만 세면 강제청산 수익 건이 빠져 과소 표시됨.
+        win_n = int((closed["realized_return_pct"] > 0).sum())
+        realized_win_rate = round(win_n / len(closed) * 100, 1) if len(closed) > 0 else None
 
         k1, k2, k3, k4, k5 = st.columns(5)
         k1.metric("보유중 (OPEN)", open_n)

@@ -70,33 +70,29 @@ _KRX_LOCAL_CACHE_DIR = os.path.join(BASE_DIR, "cache")
 _KRX_LOCAL_CACHE_PATH = os.path.join(_KRX_LOCAL_CACHE_DIR, "krx_listing_latest.csv")
 
 
-def _find_latest_krx_cache_date(max_back_days=10):
-    d = datetime.today()
-    for _ in range(max_back_days):
-        url = f"{_KRX_CACHE_BASE}/{d.strftime('%Y-%m-%d')}.csv"
-        try:
-            r = requests.head(url, timeout=10)
-            if r.status_code == 200:
-                return d.strftime("%Y-%m-%d")
-        except Exception:
-            pass
-        d -= timedelta(days=1)
-    return None
-
-
-def _fetch_krx_listing():
+def _fetch_krx_listing(max_back_days=10):
     """KOSPI+KOSDAQ 전체 종목 리스트(Marcap 포함). GitHub 캐시 실패 시 마지막으로 성공한
     로컬 캐시(cache/krx_listing_latest.csv)로 폴백 — 완전 오프라인이어도 감시봇이 죽지 않게."""
-    date_str = _find_latest_krx_cache_date()
-    if date_str:
+    d = datetime.today()
+    for _ in range(max_back_days):
+        date_str = d.strftime("%Y-%m-%d")
+        d -= timedelta(days=1)
         url = f"{_KRX_CACHE_BASE}/{date_str}.csv"
         try:
+            if requests.head(url, timeout=10).status_code != 200:
+                continue
             df = pd.read_csv(url, dtype={"Code": str, "MarketId": str})
-            os.makedirs(_KRX_LOCAL_CACHE_DIR, exist_ok=True)
-            df.to_csv(_KRX_LOCAL_CACHE_PATH, index=False, encoding="utf-8-sig")
-            return df
         except Exception as e:
             print(f"[WARN] KRX 리스트 캐시({date_str}) 다운로드 실패: {e}")
+            continue
+        # 휴장일·장 시작 전 파일은 Marcap(시총)이 전부 비어 있다 — 그대로 쓰면 시총 정렬이 안 돼
+        # "시총 상위 N"이 파일 순서(종목명 순)의 엉뚱한 소형주로 채워지므로, 시총이 채워진
+        # 가장 최근 날짜까지 거슬러 올라간다.
+        if "Marcap" not in df.columns or not df["Marcap"].notna().any():
+            continue
+        os.makedirs(_KRX_LOCAL_CACHE_DIR, exist_ok=True)
+        df.to_csv(_KRX_LOCAL_CACHE_PATH, index=False, encoding="utf-8-sig")
+        return df
 
     if os.path.exists(_KRX_LOCAL_CACHE_PATH):
         print("[WARN] KRX 종목 리스트 최신 조회 실패 — 로컬 캐시로 폴백")
@@ -546,25 +542,27 @@ def load_backtest_stats():
 def compute_trade_levels(close, sma20, atr14):
     """매수가(신호일 종가) 대비 손절가/목표가/손익비를 계산.
 
-    손절가 = 매수가 - 1.5*ATR(14) — 변동성 기반 표준 손절폭(ATR을 못 구하면 종가의 2%로 대체).
+    손절가 = 매수가 - 2.5*ATR(14) — 변동성 기반 손절폭(ATR을 못 구하면 종가의 2%로 대체).
+            1.5*ATR은 일상적인 흔들림에도 자주 걸려서, 3년 백테스트에서 2.5*ATR로 넓혔을 때
+            전략 전반의 승률이 3~5%p 높았음. 목표가 쪽 기준폭은 기존 그대로 1.5*ATR의 2배(=3*ATR).
     목표가 = 20일선(SMA20)이 매수가보다 위에 있으면 그 값을 사용 — 실제 백테스트의 익절 규칙
             (backtest_core.simulate_trades: 종가가 SMA20에 도달하면 익절)과 일치시킴.
             평균회귀 전략(bb_lower/rsi_oversold/doubleb)은 대부분 이 경우에 해당.
             추세추종 전략(golden_cross/new_high_20/rising_bearish)은 진입 시점에 이미
-            종가가 SMA20 위인 경우가 많아 SMA20이 목표가로 부적절 — 이때는 손절폭의 2배를
-            목표가로 잡아(손익비 2:1) 항상 의미 있는 목표가/손익비가 나오게 함.
+            종가가 SMA20 위인 경우가 많아 SMA20이 목표가로 부적절 — 이때는 3*ATR 위를
+            목표가로 잡아 항상 의미 있는 목표가/손익비가 나오게 함.
     """
     if atr14 is None or pd.isna(atr14) or atr14 <= 0:
         atr14 = close * 0.02
 
-    stop = close - 1.5 * atr14
+    stop = close - 2.5 * atr14
     if stop <= 0:
         stop = close * 0.9
 
     if sma20 is not None and pd.notna(sma20) and sma20 > close:
         target = sma20
     else:
-        target = close + 2 * (close - stop)
+        target = close + 3 * atr14
 
     risk = close - stop
     reward = target - close
