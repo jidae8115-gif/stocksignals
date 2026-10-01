@@ -15,7 +15,7 @@ SIX_STRATEGIES = ["doubleb", "rsi_oversold", "bb_lower", "golden_cross", "new_hi
 def main():
     parser = argparse.ArgumentParser(description="전체 시장 6개 전략 백테스트")
     parser.add_argument("--years", type=int, default=3)
-    parser.add_argument("--hold-days", type=int, default=5)
+    parser.add_argument("--hold-days", type=int, default=10)
     args = parser.parse_args()
 
     kr_tickers = c.get_kr_universe(market="ALL")

@@ -22,7 +22,7 @@ def run(market, tickers, volume_filter, years, hold_days, progress_cb):
 def main():
     parser = argparse.ArgumentParser(description="더블비 볼린저밴드 백테스트")
     parser.add_argument("--years", type=int, default=3)
-    parser.add_argument("--hold-days", type=int, default=5)
+    parser.add_argument("--hold-days", type=int, default=10)
     parser.add_argument("--top-n-kr", type=int, default=100)
     parser.add_argument("--top-n-us", type=int, default=500)
     args = parser.parse_args()

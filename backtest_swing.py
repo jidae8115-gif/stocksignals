@@ -18,7 +18,7 @@ KOSDAQ_ONLY_STRATEGIES = ["momentum_continuation_v2"]
 def main():
     parser = argparse.ArgumentParser(description="기존 5개 전략 백테스트 (KOSPI100/S&P500)")
     parser.add_argument("--years", type=int, default=3)
-    parser.add_argument("--hold-days", type=int, default=5)
+    parser.add_argument("--hold-days", type=int, default=10)
     parser.add_argument("--volume-filter", action="store_true", help="거래량 필터 적용 (기본 미적용)")
     args = parser.parse_args()
 

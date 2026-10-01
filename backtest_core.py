@@ -1,5 +1,5 @@
 # 백테스트 공용 엔진: 신호 발생일 종가 매수 → 손절가 도달 시 즉시 손절, 목표가(20일선 또는
-# 진입가+3×ATR) 도달 시 익절, 최대 N거래일 지나면 강제청산.
+# 진입가+3×ATR) 도달 시 익절, 종가가 진입가와 5일선 위면 수익청산, 최대 N거래일 지나면 강제청산.
 # 예전엔 손절 체크가 전혀 없어서(20일선 익절만 확인) 백테스트 승률이 실제 라이브 추적
 # (track_recommendations.py, 매일 손절가 체크)보다 부풀려져 있었음 — live와 동일한 규칙으로 수정.
 import pandas as pd
@@ -7,7 +7,7 @@ import pandas as pd
 import common as c
 
 
-def simulate_trades(df, signal_fn, hold_days=5):
+def simulate_trades(df, signal_fn, hold_days=10):
     trades = []
     n = len(df)
     for i in range(50, n - 1):
@@ -42,6 +42,9 @@ def simulate_trades(df, signal_fn, hold_days=5):
             if close_j >= target:
                 exit_price, exit_date, exit_reason = close_j, df.index[j], "take_profit"
                 break
+            if c.is_profit_exit(close_j, entry_price, df["SMA5"].iloc[j]):
+                exit_price, exit_date, exit_reason = close_j, df.index[j], "profit_exit"
+                break
             if h == hold_days:
                 exit_price, exit_date, exit_reason = close_j, df.index[j], "force_close"
 
@@ -71,7 +74,7 @@ def summarize(trades_df):
     }
 
 
-def backtest_universe(tickers, market, strategy_key, hold_days=5, require_volume=False,
+def backtest_universe(tickers, market, strategy_key, hold_days=10, require_volume=False,
                        require_liquidity=False, years=3, progress_cb=None):
     """전 종목에 대해 신호→청산 시뮬레이션을 실행하고 개별 거래 내역을 DataFrame으로 반환."""
     spec = c.STRATEGIES[strategy_key]

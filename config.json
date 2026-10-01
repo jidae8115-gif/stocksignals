@@ -18,7 +18,7 @@
     "us_min_value_usd": 5000000
   },
   "backtest": {
-    "hold_days": 5,
+    "hold_days": 10,
     "lookback_years": 3
   },
   "telegram": {

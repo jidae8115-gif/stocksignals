@@ -240,12 +240,13 @@ with tab_reco:
 # ---------- 성과추적 ----------
 with tab_track:
     st.caption(
-        "추천된 순간부터 현재가·현재수익률을 계속 추적. 목표가 도달(TARGET_HIT)/손절가 도달(STOP_HIT)/"
-        "5거래일 강제청산(FORCE_CLOSED) 중 하나가 발생하면 청산 처리, 아직이면 OPEN으로 계속 갱신."
+        "추천된 순간부터 현재가·현재수익률을 계속 추적. 목표가 도달(TARGET_HIT)/수익청산(PROFIT_EXIT, 종가가 "
+        "매수가와 5일선 위)/손절가 도달(STOP_HIT)/최대 10거래일 강제청산(FORCE_CLOSED) 중 하나가 발생하면 "
+        "청산 처리, 아직이면 OPEN으로 계속 갱신."
     )
 
     status_label = {
-        "OPEN": "🔵 보유중", "TARGET_HIT": "🟢 목표달성",
+        "OPEN": "🔵 보유중", "TARGET_HIT": "🟢 목표달성", "PROFIT_EXIT": "🟢 수익청산",
         "STOP_HIT": "🔴 손절", "FORCE_CLOSED": "⚪ 강제청산",
     }
 
@@ -263,12 +264,15 @@ with tab_track:
         win_n = int((closed["realized_return_pct"] > 0).sum())
         realized_win_rate = round(win_n / len(closed) * 100, 1) if len(closed) > 0 else None
 
-        k1, k2, k3, k4, k5 = st.columns(5)
+        profit_exit_n = int((closed["status"] == "PROFIT_EXIT").sum())
+
+        k1, k2, k3, k4, k5, k6 = st.columns(6)
         k1.metric("보유중 (OPEN)", open_n)
         k2.metric("목표달성", target_n)
-        k3.metric("손절", stop_n)
-        k4.metric("강제청산", force_n)
-        k5.metric("실현 승률", f"{realized_win_rate}%" if realized_win_rate is not None else "—")
+        k3.metric("수익청산", profit_exit_n)
+        k4.metric("손절", stop_n)
+        k5.metric("강제청산", force_n)
+        k6.metric("실현 승률", f"{realized_win_rate}%" if realized_win_rate is not None else "—")
 
         st.write("")
         fc1, fc2 = st.columns(2)

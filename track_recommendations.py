@@ -99,8 +99,12 @@ def update_open_positions(log_df):
             continue
 
         target, stop = float(row["target"]), float(row["stop_loss"])
+        entry = float(row["buy_price"])
         max_hold = c.get_max_hold_days(row["strategy"])
         status, exit_date, exit_price = "OPEN", None, None
+        sma5 = df["Close"].rolling(5).mean()
+        # 장중엔 마지막 일봉이 아직 확정 전(잠정 종가)이라 종가 기준 수익청산 판정에서 제외.
+        partial_dt = df.index[-1] if c.is_market_hours(row["market"]) else None
 
         for h, (dt, r) in enumerate(forward.iterrows(), start=1):
             if r["Low"] <= stop:
@@ -111,9 +115,11 @@ def update_open_positions(log_df):
             if r["Close"] >= target:
                 status, exit_date, exit_price = "TARGET_HIT", dt, c.apply_slippage(target)
                 break
+            if dt != partial_dt and c.is_profit_exit(float(r["Close"]), entry, sma5.loc[dt]):
+                status, exit_date, exit_price = "PROFIT_EXIT", dt, c.apply_slippage(float(r["Close"]))
+                break
             if h >= max_hold:
-                # 종가베팅처럼 max_hold_days=1인 전략은 여기서 다음날 시가/종가로 바로 청산되고,
-                # 나머지 전략은 기존과 동일하게 5일째 강제청산.
+                # 목표·손절·수익청산 어느 것도 안 걸린 채 최대 보유일수(get_max_hold_days)에 도달하면 강제청산.
                 status, exit_date, exit_price = "FORCE_CLOSED", dt, c.apply_slippage(float(r["Close"]))
                 break
 
@@ -147,8 +153,9 @@ def update_open_positions(log_df):
 
 def notify_exit(row, status, exit_price, realized_pct):
     """OPEN 포지션이 목표가/손절가 도달 또는 강제청산으로 종료됐을 때 텔레그램 알림."""
-    icon = {"TARGET_HIT": "🎯", "STOP_HIT": "🛑", "FORCE_CLOSED": "⏱️"}.get(status, "📌")
-    label = {"TARGET_HIT": "목표가 도달 (수익 실현)", "STOP_HIT": "손절가 도달",
+    icon = {"TARGET_HIT": "🎯", "PROFIT_EXIT": "💰", "STOP_HIT": "🛑", "FORCE_CLOSED": "⏱️"}.get(status, "📌")
+    label = {"TARGET_HIT": "목표가 도달 (수익 실현)", "PROFIT_EXIT": "수익청산 (5일선 위 수익 종가)",
+              "STOP_HIT": "손절가 도달",
               "FORCE_CLOSED": "보유기간 만료 강제청산"}.get(status, status)
     sign = "+" if realized_pct >= 0 else ""
     lines = [
@@ -171,7 +178,7 @@ def main():
 
     open_n = int((log_df["status"] == "OPEN").sum()) if not log_df.empty else 0
     closed = log_df[log_df["status"] != "OPEN"] if not log_df.empty else log_df
-    win_n = int((closed["status"] == "TARGET_HIT").sum()) if not closed.empty else 0
+    win_n = int(closed["status"].isin(["TARGET_HIT", "PROFIT_EXIT"]).sum()) if not closed.empty else 0
     print(f"추적 로그 갱신: 총 {len(log_df)}건 (OPEN {open_n}건, 청산 {len(closed)}건 중 목표달성 {win_n}건)")
     print(f"저장: {LOG_PATH}")
 

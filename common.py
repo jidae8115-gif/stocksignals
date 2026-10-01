@@ -483,13 +483,16 @@ STRATEGIES = {
     # 종가베팅 실전 편입 — 코스피에선 승률<50%(백테스트)였지만 코스닥에선 승률 51~52%·평균수익
     # 0.7~1.06%로 KOSDAQ150/200/300·2~3년 반복 검증에서 일관됨. 그래서 스캔은 KOSDAQ 전용으로
     # scan_recommendations.py에서 분리 처리(KOSPI 스캔의 strategy_keys에선 제외).
-    # max_hold_days=1 — 이 전략의 핵심은 "당일 종가 매수, 다음날 바로 청산"인데 범용 5일
+    # max_hold_days=3 — 수익청산 규칙(is_profit_exit) 도입 후 3년 백테스트에서 1일 고정 청산
+    # (승률 51%, 평균 0.93%)보다 "최대 3일 안에 첫 수익 종가 청산"(승률 69%, 평균 1.15%, 평균보유
+    # 1.8일)이 나아서 1→3으로 변경. 아래는 1일로 정했던 당시의 배경 설명.
+    # 이 전략의 핵심은 "당일 종가 매수, 다음날 바로 청산"인데 범용 5일
     # 보유 엔진에 태우면 목표/손절을 못 맞춘 건들이 5일까지 질질 끌려가며 전략 취지가 사라짐
     # (실측: 5일 엔진에선 평균보유 5.5일로 늘어나며 승률 43.76%로 하락 — 원래 검증한 1.5일/승률
     # 50~52%짜리 전략과 다른 물건이 됨). 백테스트·실전 추적 둘 다 이 값을 강제해야 함.
     "momentum_continuation_v2": {
         "name": "종가베팅-모멘텀연속(코스닥)", "signal_fn": signal_momentum_continuation_v2,
-        "min_bars": 25, "max_hold_days": 1,
+        "min_bars": 25, "max_hold_days": 3,
     },
 }
 
@@ -497,12 +500,21 @@ STRATEGIES = {
 PRODUCTION_STRATEGIES = {"KR": "bb_lower", "US": "rsi_oversold"}
 
 
-def get_max_hold_days(strategy_key, default=5):
-    """전략별 최대 보유일수 — 대부분 5일(기존 규칙)이지만 종가베팅처럼 하루짜리 전략은
+def get_max_hold_days(strategy_key, default=10):
+    """전략별 최대 보유일수 — 대부분 10일이지만 종가베팅처럼 단기 전략은
     STRATEGIES 항목에 max_hold_days로 오버라이드. 백테스트 엔진과 실전 추적
     (track_recommendations.py) 둘 다 이 값을 써야 같은 규칙으로 동작한다."""
     spec = STRATEGIES.get(strategy_key, {})
     return spec.get("max_hold_days", default)
+
+
+def is_profit_exit(close, entry_price, sma5):
+    """수익청산 조건 — 종가가 진입가보다 높고 5일선 위. 목표가(중앙값 +9%)는 며칠 안에 닿는
+    경우가 드물어 대부분 강제청산으로 끝났는데, 수익 난 종가에 바로 나오면 3년 백테스트에서
+    강제청산 비중 81%→8%, 승률 55%→78%, 거래당 평균수익률은 그대로였음(보유 10일 기준)."""
+    if sma5 is None or pd.isna(sma5):
+        return False
+    return bool(close > entry_price and close > sma5)
 
 # 신호는 "그날 종가"를 기준으로 계산되므로(RSI/SMA/BB 전부 종가 포함 지표), 장중 조기 스캔은
 # 아직 확정 안 된 값으로 잠정 신호일 수 있음 — 마감 직전에 재확인 후 매수하는 게 백테스트 규칙과 일치.
